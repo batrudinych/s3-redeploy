@@ -1,0 +1,48 @@
+{
+  "name": "s3-redeploy",
+  "version": "0.0.2",
+  "description": "s3-deploy npm package rework",
+  "main": "./src/index.js",
+  "bin": "./bin/s3-redeploy.js",
+  "scripts": {
+    "lint": "eslint *.js",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denis-fatkhudinov/s3-redeploy.git"
+  },
+  "keywords": [
+    "s3",
+    "cloudfront",
+    "s3-deploy",
+    "aws",
+    "static",
+    "hosting"
+  ],
+  "author": "@denis-fatkhudinov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/denis-fatkhudinov/s3-redeploy/issues"
+  },
+  "homepage": "https://github.com/denis-fatkhudinov/s3-redeploy#readme",
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.360.0",
+    "co": "^4.6.0",
+    "glob": "^7.1.3"
+  },
+  "devDependencies": {
+    "eslint": "^5.9.0",
+    "jest": "^23.6.0"
+  },
+  "files": [
+    "LICENSE",
+    "History.md",
+    "README.md",
+    "bin/",
+    "src/"
+  ]
+}
