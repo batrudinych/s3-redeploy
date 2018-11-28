@@ -15,15 +15,7 @@ const parseCmdArgs = () => {
   return params;
 };
 
-const checkParams = params => {
-  // TODO: add validation, dash to camel
-  if (!params.bucket) {
-    throw new Error('Bucket name should be set');
-  }
-  return params;
-};
-
-require('../src/index')(checkParams(parseCmdArgs()))
+require('../src/index')(parseCmdArgs())
   .then(() => console.log('Execution complete'))
   .catch(err => {
     console.log('Execution failed');

@@ -19,22 +19,33 @@ const {
 // else {
 // errors.push(file);
 // }
-
 // TODO:
-// #1 implement a command line args parser (list tbc)
-// #2 store map of hashes onto s3 and use it upon processing (+ check { ACL: private } works as needed)
-// #3 introduce high-level comparison of hash maps
-// #4 refactor: replace s3 mock with a real handler, introduce parallel processing, spread onto modules, etc.
-// #5 add Cloudfront distribution invalidate option
-// #6 fill additional AWS parameters
-// #5 implement tests using Jest
-// #6 add redirect objects support
-// #7 make a library out of this, that is possible to use as both script and an imported codebase
+// perform requests in parallel (write a util function for that)
+// use maps instead of objects
+// build more comprehensive S3 parameters for upload / download (content-type, cache, etc)
+// add cloudfront invalidation
+// extend command line parameters list: aws profile, custom hash map name, custom hash algorithm...
+// add command line parameters validation (both required / optional and type), dash to camel
+// refactor code -> spread lib to modules, think about shared params (like s3Client)
+// take a look at ACL:private for hash map
+// build redirect objects
+// add a local hash map and add a possibility to use it upon update
+// add jsdocs / comments to methods
+// unit tests + proper error handling
+// check on Windows
+// add Travis and coverall + badges
 
-// TODO: think about work with versions and prefixes
+// TODO: think about work with versions and prefixes for S3 objects
 
+const checkParams = params => {
+  if (!params.bucket) {
+    throw new Error('Bucket name should be set');
+  }
+  return params;
+};
+// TODO: supported now: bucket, region, cwd, pattern
 module.exports = co.wrap(function* (params) {
-  // TODO: sanitize / validate params
+  checkParams(params);
   const basePath = path.resolve(process.cwd(), params.cwd || '');
   const s3Params = { Bucket: params.bucket };
   const fileNames = (yield globAsync(params.pattern || './**', { cwd: basePath }))
@@ -44,11 +55,11 @@ module.exports = co.wrap(function* (params) {
   // TODO: add profile usage possibility. Default is used for now
   const awsOptions = {
     sslEnabled: true,
-    // region: params.region,
+    region: params.region,
   };
   aws.config.update(awsOptions);
-  const s3Client = new aws.S3();
-  // const s3Client = require('../s3-mock').getS3Mock(params.bucket);
+  // const s3Client = new aws.S3();
+  const s3Client = require('../s3-mock').getS3Mock(params.bucket);
 
   const localHashesMap = yield computeLocalFilesStats(fileNames, basePath);
   const remoteHashesMap = yield getRemoteFilesStats(s3Client, s3Params);
