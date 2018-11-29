@@ -5,23 +5,22 @@ const path = require('path');
 const {
   globAsync,
   computeLocalFilesStats,
-  getRemoteFilesStats,
-  deleteObjects,
-  uploadObjects,
   detectFileChanges,
-  storeHashMap,
-} = require('./lib');
+} = require('./lib/utils');
+
+const s3Helper = require('./lib/s3-helper');
 
 // In order to run this:
 // #1 run install --no-save mock-aws-s3
 // #2 correct the following line in mock-aws-s3/lib/mock: line 210 "if (truncated && search.Delimiter) {" -> "if (truncated) {"
-// #3 comment lines 229 -> 231 deleteObjects of function:
+// #3 comment lines 229 -> 231 s3Helper.deleteObjects of function:
 // else {
 // errors.push(file);
 // }
 // TODO:
-// perform requests in parallel (write a util function for that)
 // use maps instead of objects
+// fix versions in package.json
+// rework mapPromise to parallel execution in more balanced way + create a gist
 // build more comprehensive S3 parameters for upload / download (content-type, cache, etc)
 // add cloudfront invalidation
 // extend command line parameters list: aws profile, custom hash map name, custom hash algorithm...
@@ -47,7 +46,7 @@ const checkParams = params => {
 module.exports = co.wrap(function* (params) {
   checkParams(params);
   const basePath = path.resolve(process.cwd(), params.cwd || '');
-  const s3Params = { Bucket: params.bucket };
+  const s3BaseParams = { Bucket: params.bucket };
   const fileNames = (yield globAsync(params.pattern || './**', { cwd: basePath }))
     .map(p => path.relative(basePath, path.resolve(basePath, p)))
     .filter(p => !!p);
@@ -60,9 +59,10 @@ module.exports = co.wrap(function* (params) {
   aws.config.update(awsOptions);
   // const s3Client = new aws.S3();
   const s3Client = require('../s3-mock').getS3Mock(params.bucket);
+  const s3HelperInstance = s3Helper.getInstance(s3Client, s3BaseParams);
 
   const localHashesMap = yield computeLocalFilesStats(fileNames, basePath);
-  const remoteHashesMap = yield getRemoteFilesStats(s3Client, s3Params);
+  const remoteHashesMap = yield s3HelperInstance.getRemoteFilesStats();
 
   // TODO: if local map is empty => clear the bucket?
   const { toUpload, toDelete } = detectFileChanges(localHashesMap, remoteHashesMap);
@@ -72,13 +72,13 @@ module.exports = co.wrap(function* (params) {
 
   if (uploadNeeded) {
     console.log('Uploading', uploadNeeded, 'files');
-    yield uploadObjects(s3Client, { toUpload, basePath, s3Params });
+    yield s3HelperInstance.uploadObjects({ toUpload, basePath });
   }
 
   if (removalNeeded) {
     console.log('Removing', removalNeeded, 'files');
-    yield deleteObjects(s3Client, { toDelete, s3Params });
+    yield s3HelperInstance.deleteObjects({ toDelete });
   }
 
-  yield storeHashMap(s3Client, JSON.stringify(localHashesMap), s3Params);
+  yield s3HelperInstance.storeHashMap(JSON.stringify(localHashesMap), s3BaseParams);
 });
