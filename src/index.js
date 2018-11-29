@@ -11,7 +11,7 @@ const {
 
 const s3Helper = require('./lib/s3-helper');
 
-// Supported params: bucket, region, cwd, pattern, concurrency, file-name, gzip [txt,html,...], cache (in seconds)
+// Supported params: bucket, region, cwd, pattern, concurrency, file-name, gzip [txt,html,...], cache (in seconds), profile
 module.exports = co.wrap(function* (params) {
   const opts = processParams(params);
 
@@ -26,6 +26,9 @@ module.exports = co.wrap(function* (params) {
     region: opts.region,
   };
   aws.config.update(awsOptions);
+  if (opts.profile) {
+    aws.config.credentials = new aws.SharedIniFileCredentials({ profile: opts.profile });
+  }
   const s3Client = new aws.S3();
   const s3HelperInstance = s3Helper.getInstance(s3Client, opts);
 
