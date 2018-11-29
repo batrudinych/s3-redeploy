@@ -3,12 +3,6 @@ Rework of s3-deploy package
 
 # Module status: WIP until 0.1.0 release
 
-* In order to do check it with s3 mock:
-  * run install --no-save mock-aws-s3
-* correct the following line in mock-aws-s3/lib/mock: <code>line 210 "if (truncated && search.Delimiter) {"</code> -> <code>"if (truncated) {"</code>
-* comment lines 229 -> 231 s3Helper.deleteObjects of function:
-  * <code>else { errors.push(file); }</code>
-
 TODO:
 * use maps instead of objects
 * fix versions in package.json

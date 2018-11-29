@@ -1,6 +1,6 @@
 {
   "name": "s3-redeploy",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "s3-deploy npm package rework",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",

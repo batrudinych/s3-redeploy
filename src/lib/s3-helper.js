@@ -4,6 +4,7 @@ const path = require('path');
 
 class S3Helper {
   constructor(s3Client, params) {
+    this._cache = params.cache;
     this._gzip = params.gzip;
     this._mapFileName = params.fileName;
     this._concurrency = params.concurrency;
@@ -86,6 +87,10 @@ class S3Helper {
 
     if (shouldBeZipped) {
       putParams.ContentEncoding = 'gzip';
+    }
+
+    if (this._cache) {
+      putParams.CacheControl = 'max-age=' + this._cache;
     }
 
     return this._s3Client.putObject(putParams).promise();

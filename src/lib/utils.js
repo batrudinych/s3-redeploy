@@ -123,7 +123,7 @@ module.exports.processParams = params => {
 
   result.pattern = params.pattern || './**';
   result.cwd = params.cwd || '';
-  result.concurrency = parseInt(params.concurrency || 5);
+  result.concurrency = parseInt(params.concurrency || 5, 10);
   result.fileName = params.fileName || `_s3-rd.${params.bucket}.json`;
 
   if (result.gzip && typeof result.gzip === 'string') {

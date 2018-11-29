@@ -11,7 +11,7 @@ const {
 
 const s3Helper = require('./lib/s3-helper');
 
-// Supported params: bucket, region, cwd, pattern, concurrency, file-name, gzip
+// Supported params: bucket, region, cwd, pattern, concurrency, file-name, gzip [txt,html,...], cache (in seconds)
 module.exports = co.wrap(function* (params) {
   const opts = processParams(params);
 
@@ -27,7 +27,6 @@ module.exports = co.wrap(function* (params) {
   };
   aws.config.update(awsOptions);
   const s3Client = new aws.S3();
-  // const s3Client = require('../s3-mock/s3-mock').getS3Mock(opts.bucket);
   const s3HelperInstance = s3Helper.getInstance(s3Client, opts);
 
   const localHashesMap = yield computeLocalFilesStats(fileNames, basePath, opts.concurrency);
