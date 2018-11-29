@@ -1,36 +1,18 @@
-const { mapPromises } = require('./utils');
+const { mapPromises, gzipStream, gzipAsync, gunzipAsync } = require('./utils');
 const fs = require('fs');
 const path = require('path');
 
 class S3Helper {
-  constructor(s3Client, s3Params) {
-    this._S3_HASHES_FILE_NAME = '__hash_map__.json';
-    this._S3_CONCURRENCY = 5;
+  constructor(s3Client, params) {
+    this._gzip = params.gzip;
+    this._mapFileName = params.fileName;
+    this._concurrency = params.concurrency;
     this._s3Client = s3Client;
-    this._s3Params = s3Params;
+    this._s3BaseParams = { Bucket: params.bucket };
+    this._s3UploadParams = Object.assign({}, this._s3BaseParams);
   }
 
-  getRemoteMap() {
-    return this._s3Client.getObject(Object.assign({ Key: this._S3_HASHES_FILE_NAME }, this._s3Params))
-      .promise()
-      .then(data => data.Body)
-      .catch(err => {
-        if (err.statusCode === 404) return null;
-        throw err;
-      });
-  }
-
-  _uploadObject({ fileName, fileData, basePath }) {
-    return this._s3Client.putObject(
-      Object.assign({
-        ACL: 'public-read',
-        Key: fileName,
-        Body: fs.createReadStream(path.join(basePath, fileName)),
-        ContentMD5: fileData.contentMD5,
-      }, this._s3Params)).promise();
-  }
-
-  deleteObjects({ toDelete }) {
+  deleteObjects(toDelete) {
     const allObjects = Object.keys(toDelete).map(Key => ({ Key }));
     const batchSize = 1000;
     const batchesCount = Math.ceil(allObjects.length / batchSize);
@@ -41,32 +23,45 @@ class S3Helper {
     }
     return mapPromises(
       batches,
-      batch => this._s3Client.deleteObjects(Object.assign({ Delete: { Objects: batch } }, this._s3Params)).promise(),
-      this._S3_CONCURRENCY
+      batch => this._s3Client.deleteObjects(Object.assign({ Delete: { Objects: batch } }, this._s3BaseParams)).promise(),
+      this._concurrency
     );
   }
 
-  uploadObjects({ toUpload, basePath }) {
+  uploadObjects(toUpload, basePath) {
     return mapPromises(
       Object.keys(toUpload),
-      fileName => this._uploadObject({ fileName, fileData: toUpload[fileName], basePath }),
-      this._S3_CONCURRENCY
+      fileName => this._uploadObject(fileName, toUpload[fileName], basePath),
+      this._concurrency
     );
   }
 
-  storeHashMap(body) {
-    return this._s3Client.putObject(Object.assign({ Key: this._S3_HASHES_FILE_NAME, Body: body }, this._s3Params)).promise();
+  getRemoteHashMap() {
+    return this._s3Client.getObject(Object.assign({ Key: this._mapFileName }, this._s3BaseParams))
+      .promise()
+      .then(data => gunzipAsync(data.Body))
+      .then(buff => buff.toString('utf8'))
+      .catch(err => {
+        if (err.statusCode === 404) return null;
+        throw err;
+      });
+  }
+
+  storeRemoteHashMap(map) {
+    const mapUploadParams = Object.assign({ ContentEncoding: 'gzip' }, this._s3BaseParams);
+    return gzipAsync(JSON.stringify(map))
+      .then(buff => this._s3Client.putObject(Object.assign({ Key: this._mapFileName, Body: buff }, mapUploadParams)).promise());
   }
 
   * computeRemoteFilesStats() {
-    const params = Object.assign({}, this._s3Params);
+    const params = Object.assign({}, this._s3BaseParams);
     let hasNext = true;
     const remoteFilesStats = {};
     while (hasNext) {
       const { Contents, IsTruncated, NextContinuationToken } = yield this._s3Client.listObjectsV2(params).promise();
       for (const item of Contents) {
         // TODO: in case of user input, may be nested
-        if (item.Key === this._S3_HASHES_FILE_NAME) continue;
+        if (item.Key === this._mapFileName) continue;
         remoteFilesStats[item.Key] = item;
       }
       hasNext = IsTruncated;
@@ -76,9 +71,34 @@ class S3Helper {
   }
 
   * getRemoteFilesStats() {
-    const remoteStoredMap = yield this.getRemoteMap(this._s3Params);
+    const remoteStoredMap = yield this.getRemoteHashMap(this._s3BaseParams);
     return remoteStoredMap ? JSON.parse(remoteStoredMap) : (yield this.computeRemoteFilesStats());
+  }
+
+  _uploadObject(fileName, fileData, basePath) {
+    const fStream = this._shouldGzip(fileName)
+      ? gzipStream(fs.createReadStream(path.join(basePath, fileName)))
+      : fs.createReadStream(path.join(basePath, fileName));
+
+    return this._s3Client.putObject(
+      Object.assign({
+        ACL: 'public-read',
+        Key: fileName,
+        Body: fStream,
+        ContentMD5: fileData.contentMD5,
+      }, this._s3UploadParams)).promise();
+  }
+
+  _shouldGzip(fileName) {
+    if (this._gzip) {
+      if (Array.isArray(this._gzip)) {
+        const extName = path.extname(fileName).substring(1).toLowerCase();
+        if (extName) return this._gzip.includes(extName);
+      } else {
+        return true;
+      }
+    }
   }
 }
 
-module.exports.getInstance = (s3Client, s3Params) => new S3Helper(s3Client, s3Params);
+module.exports.getInstance = (s3Client, params) => new S3Helper(s3Client, params);
