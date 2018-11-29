@@ -9,7 +9,6 @@ class S3Helper {
     this._concurrency = params.concurrency;
     this._s3Client = s3Client;
     this._s3BaseParams = { Bucket: params.bucket };
-    this._s3UploadParams = Object.assign({}, this._s3BaseParams);
   }
 
   deleteObjects(toDelete) {
@@ -76,17 +75,20 @@ class S3Helper {
   }
 
   _uploadObject(fileName, fileData, basePath) {
-    const fStream = this._shouldGzip(fileName)
-      ? gzipStream(fs.createReadStream(path.join(basePath, fileName)))
-      : fs.createReadStream(path.join(basePath, fileName));
+    const shouldBeZipped = this._shouldGzip(fileName);
+    const fStream = fs.createReadStream(path.join(basePath, fileName));
+    const putParams = Object.assign({
+      ACL: 'public-read',
+      Key: fileName,
+      Body: shouldBeZipped ? gzipStream(fStream) : fStream,
+      ContentMD5: fileData.contentMD5,
+    }, this._s3BaseParams);
 
-    return this._s3Client.putObject(
-      Object.assign({
-        ACL: 'public-read',
-        Key: fileName,
-        Body: fStream,
-        ContentMD5: fileData.contentMD5,
-      }, this._s3UploadParams)).promise();
+    if (shouldBeZipped) {
+      putParams.ContentEncoding = 'gzip';
+    }
+
+    return this._s3Client.putObject(putParams).promise();
   }
 
   _shouldGzip(fileName) {
