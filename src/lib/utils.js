@@ -1,23 +1,42 @@
 const glob = require('glob');
-
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+/**
+ * Pipe a gzip stream to the given stream
+ * @param stream
+ */
 module.exports.gzipStream = stream => {
   const zip = zlib.createGzip();
   return stream.pipe(zip);
 };
-
+/**
+ * Promisified version of zlib.gzip
+ * @param data
+ * @returns {Promise<Buffer>}
+ */
 module.exports.gzipAsync = data => new Promise((resolve, reject) => zlib.gzip(data, (err, result) => err ? reject(err) : resolve(result)));
-
+/**
+ * Promisified version of zlib.gunzip method
+ * @param data
+ * @returns {Promise<Buffer>}
+ */
 module.exports.gunzipAsync = data =>
   new Promise((resolve, reject) => zlib.gunzip(data, (err, result) => err ? reject(err) : resolve(result)));
-
+/**
+ * Promisified version of fs.stat method
+ * @param path - Path to the file
+ * @returns {Promise<Object>} - Promise, which resolves with file statistics
+ */
 module.exports.fsStatAsync = path => new Promise((resolve, reject) => fs.stat(path, (err, stats) => err ? reject(err) : resolve(stats)));
-
-// Get Uint array with hash using streams
+/**
+ * Calculate file hash using stream API
+ * @param path - Path to the file
+ * @param alg - Algorithm to be used
+ * @returns {Promise<Array>} - Promise, which resolves with a Uint array, containing hash
+ */
 module.exports.computeFileHash = (path, alg) => new Promise((resolve, reject) => {
   const hash = crypto.createHash(alg);
   fs.createReadStream(path).pipe(hash) // TODO close file on error
@@ -27,12 +46,21 @@ module.exports.computeFileHash = (path, alg) => new Promise((resolve, reject) =>
       resolve(hash.read());
     });
 });
-
-// Get list of file names, matching the pattern. Can be both absolute / relative
+/**
+ * Calculate list of files, matching supplied glob pattern. Promisified version of 'glob' method
+ * See https://www.npmjs.com/package/glob
+ * @param pattern - Glob pattern
+ * @param options - Options according to glob package documentation
+ * @returns {Promise<Array>} - Promise, which resolves with an array of matching file names
+ */
 module.exports.globAsync = (pattern, options) =>
   new Promise((resolve, reject) => glob(pattern, options, (err, matches) => err ? reject(err) : resolve(matches)));
-
-// Compute local and remote states diff
+/**
+ * Calculate the difference between remote and local maps of hashes
+ * @param localHashesMap - A map of hashes of locally stored files
+ * @param remoteHashesMap - A map of hashes of files stored in S3
+ * @returns {{toUpload: {Object}, toDelete: {Object}}} - Object, containing maps of hashes to be uploaded and deleted correspondingly
+ */
 module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
   const remoteMapCopy = Object.assign({}, remoteHashesMap);
   const toUpload = {};
@@ -49,11 +77,16 @@ module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
   }
   return { toUpload, toDelete: remoteMapCopy };
 };
-
-// Compute a map of local files stats
-module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurrency = 5) {
+/**
+ * Compute a map of hashes for given files list. A generator-function.
+ * @param fileNames - File names array, relative to cwd
+ * @param basePath - Absolute path to the folder, containing files to be processed
+ * @param concurrency - Parallel execution limit
+ * @returns {Object} - Map of hashes in form of: relative [file name]: {hash data}
+ */
+module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurrency) {
   const localFilesStats = {};
-  yield module.exports.mapPromises(
+  yield module.exports.parallel(
     fileNames,
     fileName => {
       const filePath = path.join(basePath, fileName);
@@ -74,13 +107,13 @@ module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurre
 };
 
 /**
- * Run promises in parallel, applying concurrency limit
+ * Run promises in parallel, applying a concurrency limit
  * @param args - Array of arguments. fn to be invoked with each argument
  * @param fn - Function to be executed for each argument. Must return a promise
  * @param concurrency - Integer, which indicates limit of concurrently running promises allowed
  * @returns {Promise} - Promise, which resolves with an array, containing results of each invocation
  */
-module.exports.mapPromises = (args, fn, concurrency = 1) => {
+module.exports.parallel = (args, fn, concurrency = 1) => {
   if (!args.length) return Promise.resolve([]);
   const argsCopy = [].concat(args.map((val, ind) => ({ val, ind })));
   const result = new Array(args.length);
@@ -95,22 +128,30 @@ module.exports.mapPromises = (args, fn, concurrency = 1) => {
 
   return Promise.all(promises.map(chainNext)).then(() => result);
 };
-
+/**
+ * Transform process.argv into a map of values
+ * @returns {Object}
+ */
 module.exports.parseCmdArgs = () => {
   const params = {};
-  for (let i = 2; i < process.argv.length;) {
-    if (!process.argv[i + 1]) {
-      params[process.argv[i].slice(2)] = true;
-      i++;
-    } else {
-      const isNextIdent = process.argv[i + 1].startsWith('--');
-      params[process.argv[i].slice(2)] = isNextIdent ? true : process.argv[i + 1];
-      i += isNextIdent ? 1 : 2;
+  for (let i = 2; i < process.argv.length; i++) {
+    const cmdValue = process.argv[i];
+    const isIdent = cmdValue.startsWith('--');
+    if (isIdent) {
+      const key = module.exports.dashToCamel(cmdValue.slice(2));
+      const nextCmdValue = process.argv[i + 1];
+      const isNextIdent = nextCmdValue && nextCmdValue.startsWith('--');
+      params[key] = isNextIdent ? true : nextCmdValue;
+      if (!isNextIdent) i++;
     }
   }
   return params;
 };
-
+/**
+ * Sanitize and validate parameters
+ * @param params
+ * @returns {Object}
+ */
 module.exports.processParams = params => {
   if (!params.bucket) {
     throw new Error('Bucket name should be set');
@@ -132,7 +173,11 @@ module.exports.processParams = params => {
 
   return result;
 };
-
+/**
+ * Transform string in dash case to camel case
+ * @param string
+ * @returns {string}
+ */
 module.exports.dashToCamel = string => {
   if (!string) return '';
 

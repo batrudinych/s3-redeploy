@@ -1,6 +1,6 @@
 {
   "name": "s3-redeploy",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "s3-deploy npm package rework",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
@@ -21,6 +21,7 @@
     "hosting"
   ],
   "author": "@denis-fatkhudinov",
+  "contributors": ["@puzpuzpuz"],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/denis-fatkhudinov/s3-redeploy/issues"
