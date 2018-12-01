@@ -1,7 +1,7 @@
 {
   "name": "s3-redeploy",
   "version": "0.0.6",
-  "description": "s3-deploy npm package rework",
+  "description": "Node.js utility to sync files to Amazon S3.",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
   "scripts": {
