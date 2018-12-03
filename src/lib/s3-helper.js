@@ -1,12 +1,14 @@
 const { parallel, gzipStream, gzipAsync, gunzipAsync } = require('./utils');
 const fs = require('fs');
 const path = require('path');
+const mime = require('mime');
 
 /**
  * A wrapper class for handling S3-related operations
  */
 class S3Helper {
   constructor(s3Client, params) {
+    this._ignoreMap = params.ignoreMap;
     this._cache = params.cache;
     this._gzip = params.gzip;
     this._mapFileName = params.fileName;
@@ -86,9 +88,11 @@ class S3Helper {
     while (hasNext) {
       const { Contents, IsTruncated, NextContinuationToken } = yield this._s3Client.listObjectsV2(params).promise();
       for (const item of Contents) {
-        // TODO: in case of user input, may be nested
         if (item.Key === this._mapFileName) continue;
-        remoteFilesStats[item.Key] = item;
+        remoteFilesStats[item.Key] = {
+          eTag: item.ETag,
+          contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
+        };
       }
       hasNext = IsTruncated;
       params.ContinuationToken = NextContinuationToken;
@@ -101,6 +105,7 @@ class S3Helper {
    * @returns {Object}
    */
   * getRemoteFilesStats() {
+    if (this._ignoreMap) return yield this.computeRemoteFilesStats();
     const remoteStoredMap = yield this.getRemoteHashesMap();
     return remoteStoredMap || (yield this.computeRemoteFilesStats());
   }
@@ -115,6 +120,7 @@ class S3Helper {
    */
   _uploadObject(fileName, fileData, basePath) {
     const shouldBeZipped = this._shouldGzip(fileName);
+    const contentType = mime.getType(fileName);
     const fStream = fs.createReadStream(path.join(basePath, fileName));
     const putParams = Object.assign({
       ACL: 'public-read',
@@ -122,6 +128,10 @@ class S3Helper {
       Body: shouldBeZipped ? gzipStream(fStream) : fStream,
       ContentMD5: fileData.contentMD5,
     }, this._s3BaseParams);
+
+    if (contentType) {
+      putParams.ContentType = contentType;
+    }
 
     if (shouldBeZipped) {
       putParams.ContentEncoding = 'gzip';

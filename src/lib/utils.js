@@ -39,8 +39,17 @@ module.exports.fsStatAsync = path => new Promise((resolve, reject) => fs.stat(pa
  */
 module.exports.computeFileHash = (path, alg) => new Promise((resolve, reject) => {
   const hash = crypto.createHash(alg);
-  fs.createReadStream(path).pipe(hash) // TODO close file on error
-    .on('error', reject)
+  const fileStream = fs.createReadStream(path);
+  fileStream
+    .on('error', e => {
+      fileStream.close();
+      reject(e);
+    })
+    .pipe(hash)
+    .on('error', e => {
+      fileStream.close();
+      reject(e);
+    })
     .on('finish', () => {
       hash.end();
       resolve(hash.read());
@@ -68,7 +77,7 @@ module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
     const remoteFileData = remoteMapCopy[key];
     if (remoteFileData) {
       delete remoteMapCopy[key];
-      if (remoteFileData.ETag !== localHashesMap[key].ETag) {
+      if (remoteFileData.eTag !== localHashesMap[key].eTag) {
         toUpload[key] = localHashesMap[key];
       }
     } else {
@@ -95,7 +104,7 @@ module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurre
         .then(hash => {
           if (hash) {
             localFilesStats[fileName] = {
-              ETag: `"${hash.toString('hex')}"`,
+              eTag: `"${hash.toString('hex')}"`,
               contentMD5: hash.toString('base64'),
             };
           }

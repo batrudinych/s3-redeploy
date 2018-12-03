@@ -8,8 +8,6 @@ Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributio
 
 **Node.js >= 6.0.0 is required**
 
-#### As a script:
-
 npm >= 5.2.0
 ```bash
 $ npx s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
@@ -22,24 +20,7 @@ $ npm i --global s3-redeploy
 $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 
-#### As a module:
-
-```bash
-$ npm i -S s3-redeploy
-```
-
-```js
-const s3Redeploy = require('s3-redeploy')
-
-const options = { bucket: 'bucketName' };
-
-s3Redeploy(options)
-  .then(() => console.log('Files have been successfully deployed')
-  .catch(e => console.error('Uploading failed'));
-```
-
 #### Options
-**NOTE:** if package is used as a module, option name should be in camel case, e.g. `--file-name` should become `fileName`
 ```
 --bucket
 ``` 
@@ -72,6 +53,14 @@ s3Redeploy(options)
 --cf-inv-paths
 ```
 *Optional.* Semicolon-separated list of paths to invalidate in CloudFront. Example: '/images/image1.jpg;/assets/\*'. Default value is '/\*'.
+```
+--ignore-map
+```
+*Optional.* Dictionary of files and correspondent hashes will be ignored upon difference computation. This is helpful if state of S3 bucket was changed manually (not through s3-redeploy script) but dictionary remained the same. In this case, the dictionary state will be omitted during computation and at the same time **a new dictionary will be computed and uploaded to S3**
+```
+--no-rm
+```
+*Optional.* All the removed locally files will be also removed from S3 during sync by default. Use this flag to override default behavior and upload new files and update changes ones only. No files will be removed from S3. At the same time, the file hashes map will be updated to mirror S3 bucket state properly.
 ```
 --concurrency X
 ```
@@ -110,17 +99,13 @@ Let people know how they can dive into the project, include important links to t
 MIT
 
 
-TODO:
-* add mime types for S3 objects (based on extension)
-* add a possibility to ignore remote map
-* add a possibility to keep non-existing locally files
-* add verbose / silent flags and improve logging
-* use maps instead of objects
+## TODO:
 * fix versions in package.json
-* add command line parameters validation (both required / optional and type)
 * precommit hook
 * unit tests + proper error handling
 * add Travis and coverall + badges
+* use maps instead of objects
+* add verbose / silent flags and improve logging
 * build redirect objects
 * check on Windows
 

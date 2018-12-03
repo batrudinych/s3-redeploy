@@ -10,9 +10,9 @@ module.exports.parseCmdArgs = () => {
     if (isIdent) {
       const key = module.exports.dashToCamel(cmdValue.slice(2));
       const nextCmdValue = process.argv[i + 1];
-      const isNextIdent = nextCmdValue && nextCmdValue.startsWith('--');
-      params[key] = isNextIdent ? true : nextCmdValue;
-      if (!isNextIdent) i++;
+      const isCurBool = !nextCmdValue || nextCmdValue.startsWith('--');
+      params[key] = isCurBool ? true : nextCmdValue;
+      if (!isCurBool) i++;
     }
   }
   return params;
@@ -26,16 +26,28 @@ module.exports.processParams = params => {
   if (!params.bucket) {
     throw new Error('Bucket name should be set');
   }
-  const result = {};
-
-  for (const key of Object.keys(params)) {
-    result[module.exports.dashToCamel(key)] = params[key];
+  if (params.bucket.includes('\\') || params.bucket.includes('/')) {
+    throw new Error('Bucket name should contain no slashes');
   }
+
+  const result = Object.assign({}, params);
 
   result.pattern = params.pattern || './**';
   result.cwd = params.cwd || '';
-  result.concurrency = parseInt(params.concurrency || 5, 10);
+
+  if (result.concurrency) {
+    if (!module.exports.isPositiveInteger(result.concurrency)){
+      throw new Error('Concurrency value should be a positive integer');
+    }
+    result.concurrency = parseInt(params.concurrency, 10);
+  } else {
+    result.concurrency = 5;
+  }
+
   result.fileName = params.fileName || `_s3-rd.${params.bucket}.json`;
+  if (result.fileName.startsWith('/')) {
+    result.fileName = result.fileName.slice(1);
+  }
 
   if (result.cfInvPaths) {
     result.cfInvPaths = result.cfInvPaths.split(';').filter(Boolean).map(v => v[0] === '/' ? v : '/' + v);
