@@ -100,6 +100,7 @@ MIT
 
 
 ## TODO:
+* add a possibility to store no map remotely
 * fix versions in package.json
 * precommit hook
 * unit tests + proper error handling
