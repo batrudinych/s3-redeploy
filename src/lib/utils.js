@@ -35,7 +35,7 @@ module.exports.fsStatAsync = path => new Promise((resolve, reject) => fs.stat(pa
  * Calculate file hash using stream API
  * @param path - Path to the file
  * @param alg - Algorithm to be used
- * @returns {Promise<Array>} - Promise, which resolves with a Uint array, containing hash
+ * @returns {Promise<Array>} - Promise, which resolves with a Uint array, containing file hash
  */
 module.exports.computeFileHash = (path, alg) => new Promise((resolve, reject) => {
   const hash = crypto.createHash(alg);
@@ -56,10 +56,10 @@ module.exports.computeFileHash = (path, alg) => new Promise((resolve, reject) =>
 module.exports.globAsync = (pattern, options) =>
   new Promise((resolve, reject) => glob(pattern, options, (err, matches) => err ? reject(err) : resolve(matches)));
 /**
- * Calculate the difference between remote and local maps of hashes
- * @param localHashesMap - A map of hashes of locally stored files
- * @param remoteHashesMap - A map of hashes of files stored in S3
- * @returns {{toUpload: {Object}, toDelete: {Object}}} - Object, containing maps of hashes to be uploaded and deleted correspondingly
+ * Calculate the difference between remote and local maps of file hashes
+ * @param localHashesMap - A map of file hashes of locally stored files
+ * @param remoteHashesMap - A map of file hashes of files stored in S3
+ * @returns {{toUpload: {Object}, toDelete: {Object}}} - Object, containing maps of file hashes to be uploaded and deleted correspondingly
  */
 module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
   const remoteMapCopy = Object.assign({}, remoteHashesMap);
@@ -78,11 +78,11 @@ module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
   return { toUpload, toDelete: remoteMapCopy };
 };
 /**
- * Compute a map of hashes for given files list. A generator-function.
+ * Compute a map of file hashes for given files list. A generator-function.
  * @param fileNames - File names array, relative to cwd
  * @param basePath - Absolute path to the folder, containing files to be processed
  * @param concurrency - Parallel execution limit
- * @returns {Object} - Map of hashes in form of: relative [file name]: {hash data}
+ * @returns {Object} - Map of file hashes in form of: relative [file name]: {hash data}
  */
 module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurrency) {
   const localFilesStats = {};
@@ -128,63 +128,4 @@ module.exports.parallel = (args, fn, concurrency = 1) => {
 
   return Promise.all(promises.map(chainNext)).then(() => result);
 };
-/**
- * Transform process.argv into a map of values
- * @returns {Object}
- */
-module.exports.parseCmdArgs = () => {
-  const params = {};
-  for (let i = 2; i < process.argv.length; i++) {
-    const cmdValue = process.argv[i];
-    const isIdent = cmdValue.startsWith('--');
-    if (isIdent) {
-      const key = module.exports.dashToCamel(cmdValue.slice(2));
-      const nextCmdValue = process.argv[i + 1];
-      const isNextIdent = nextCmdValue && nextCmdValue.startsWith('--');
-      params[key] = isNextIdent ? true : nextCmdValue;
-      if (!isNextIdent) i++;
-    }
-  }
-  return params;
-};
-/**
- * Sanitize and validate parameters
- * @param params
- * @returns {Object}
- */
-module.exports.processParams = params => {
-  if (!params.bucket) {
-    throw new Error('Bucket name should be set');
-  }
-  const result = {};
 
-  for (const key of Object.keys(params)) {
-    result[module.exports.dashToCamel(key)] = params[key];
-  }
-
-  result.pattern = params.pattern || './**';
-  result.cwd = params.cwd || '';
-  result.concurrency = parseInt(params.concurrency || 5, 10);
-  result.fileName = params.fileName || `_s3-rd.${params.bucket}.json`;
-
-  if (result.gzip && typeof result.gzip === 'string') {
-    result.gzip = result.gzip.replace(/ /g, '').split(',').filter(Boolean).map(s => s.toLowerCase());
-  }
-
-  return result;
-};
-/**
- * Transform string in dash case to camel case
- * @param string
- * @returns {string}
- */
-module.exports.dashToCamel = string => {
-  if (!string) return '';
-
-  const parts = string.split('-');
-  let result = parts.splice(0, 1)[0].toLowerCase();
-  for (const part of parts) {
-    result += part[0].toUpperCase() + part.substring(1).toLowerCase();
-  }
-  return result;
-};

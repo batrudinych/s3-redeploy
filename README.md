@@ -1,6 +1,6 @@
 # s3-redeploy
 
-Node.js utility to sync files to Amazon S3.
+Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.
 
 # Module status: WIP until 0.1.0 release
 
@@ -55,15 +55,23 @@ s3Redeploy(options)
 ```
 --gzip
 ```
-*Optional.* Indicates whether the content should be gzipped. A corresponding `Content-Encoding: gzip` header added to uploading objects. If an array of extensions passed, only matching files will be gzipped, otherwise all the files are gzipped. Array should be represented as a comma-separated list of extensions without dots. Example: `--gzip html,js,css`
+*Optional.* Indicates whether the content should be gzipped. A corresponding `Content-Encoding: gzip` header added to uploading objects. If an array of extensions passed, only matching files will be gzipped, otherwise all the files are gzipped. Array should be represented as a semicolon-separated list of extensions without dots. Example: `--gzip 'html;js;css'`.
 ```
 --profile
 ```
-*Optional.* Name of AWS profile to be used by AWS SDK. See [AWS Docs](https://docs.aws.amazon.com/cli/latest/topic/config-vars.html)
+*Optional.* Name of AWS profile to be used by AWS SDK. See [AWS Docs](https://docs.aws.amazon.com/cli/latest/topic/config-vars.html). If a region is specified in credentials file under profile, it takes precedence over `--region` value
 ```
 --region
 ```
-Name of the region, where to apply the changes.
+*Optional.* Name of the region, where to apply the changes.
+```
+--cf-dist-id X
+```
+*Optional.* Id of CloudFront distribution to invalidate.
+```
+--cf-inv-paths
+```
+*Optional.* Semicolon-separated list of paths to invalidate in CloudFront. Example: '/images/image1.jpg;/assets/\*'. Default value is '/\*'.
 ```
 --concurrency X
 ```
@@ -104,8 +112,9 @@ MIT
 
 TODO:
 * add mime types for S3 objects (based on extension)
-* add a possibility to ignore map
-* add a possibility to invalidate cloudfront distribution
+* add a possibility to ignore remote map
+* add a possibility to keep non-existing locally files
+* add verbose / silent flags and improve logging
 * use maps instead of objects
 * fix versions in package.json
 * add command line parameters validation (both required / optional and type)

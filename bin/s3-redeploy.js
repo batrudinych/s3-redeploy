@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('../src/index')(require('../src/lib/utils').parseCmdArgs())
+require('../src/index')(require('../src/lib/args-processor').parseCmdArgs())
   .then(() => console.log('Execution complete'))
   .catch(err => {
     console.log('Execution failed');
