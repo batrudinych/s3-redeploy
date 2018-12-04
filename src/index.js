@@ -96,16 +96,20 @@ module.exports = co.wrap(function* (params) {
     }
   } else {
     console.log('Skipping removal as correspondent flag is set');
-    Object.assign(localHashesMap, toDelete);
+    if (!opts.noMap) {
+      Object.assign(localHashesMap, toDelete);
+    }
   }
 
-  console.log('Saving map of file hashes');
-  try {
-    yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
-  } catch (e) {
-    throw new CommonError('Files hash map uploading failed', { cause: e });
+  if (!opts.noMap) {
+    console.log('Saving map of file hashes');
+    try {
+      yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
+    } catch (e) {
+      throw new CommonError('Files hash map uploading failed', { cause: e });
+    }
+    console.log('Complete');
   }
-  console.log('Complete');
 
   if (opts.cfDistId) {
     console.log('Creating CloudFront invalidation for', opts.cfDistId);

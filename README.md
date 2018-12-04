@@ -56,11 +56,15 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 --ignore-map
 ```
-*Optional.* Dictionary of files and correspondent hashes will be ignored upon difference computation. This is helpful if state of S3 bucket was changed manually (not through s3-redeploy script) but dictionary remained the same. In this case, the dictionary state will be omitted during computation and at the same time **a new dictionary will be computed and uploaded to S3**
+*Optional.* Dictionary of files and correspondent hashes will be ignored upon difference computation. This is helpful if state of S3 bucket was changed manually (not through s3-redeploy script) but dictionary remained the same. In this case, the dictionary state will be omitted during computation and at the same time **a new dictionary will be computed and uploaded to S3** so it could be used in further invocation
+```
+--no-map
+```
+*Optional.* Use this flag to store and use no file hashes dictionary at all. Each script invocation will seek through the whole bucket and gather ETags. **If bucket already contains a dictionary file, it will remain as is but won't be used**
 ```
 --no-rm
 ```
-*Optional.* All the removed locally files will be also removed from S3 during sync by default. Use this flag to override default behavior and upload new files and update changes ones only. No files will be removed from S3. At the same time, the file hashes map will be updated to mirror S3 bucket state properly.
+*Optional.* By default all the removed locally files will be also removed from S3 during sync. Use this flag to override default behavior and upload new files / update changed ones only. No files will be removed from S3. At the same time, the file hashes map will be updated to mirror relevant S3 bucket state properly.
 ```
 --concurrency X
 ```
@@ -84,7 +88,7 @@ The module itself may be both executed as a script from the command line and imp
 
 In order to decrease amount of S3 invocations and increase processing speed, MD5 hashes dictionary is built for all the local files. The dictionary is uploaded along with other files and is used during further updates. Instead of querying S3 for ETags, the S3-stored dictionary is compared with local one. Thus, only changed files are updated.
 
-**IMPORTANT:** If you change the state of bucket manually, the contents of the dictionary will not be updated. Thus, perform all the bucket update operations through the script or consider manual dictionary removal, which will let the dictionary to be computed again on the next script invocation.
+**IMPORTANT:** If you change the state of bucket manually, the contents of the dictionary will not be updated. Thus, perform all the bucket update operations through the script or consider manual dictionary removal / `--ignore-map` flag usage, which will let the dictionary to be computed again and stored on the next script invocation.
 
 ## Tests
 
@@ -100,10 +104,9 @@ MIT
 
 
 ## TODO:
-* add a possibility to store no map remotely
 * fix versions in package.json
 * precommit hook
-* unit tests + proper error handling
+* unit tests
 * add Travis and coverall + badges
 * use maps instead of objects
 * add verbose / silent flags and improve logging
