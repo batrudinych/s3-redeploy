@@ -24,7 +24,7 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 --bucket
 ``` 
-*Mandatory.* Name of bucket where to sync the data
+*Mandatory.* Name of S3 bucket where to sync the data
 ```
 --cwd
 ```
@@ -32,15 +32,15 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 --pattern
 ```
-*Optional.* Glob pattern, applied to the `cwd` directory. Defaults to `./**`, which means all the files inside the current directory and subdirectories will be processed. **Should be passed in quotes in linux to be treated as a string.**
+*Optional.* Glob pattern, applied to the `cwd` directory. Defaults to `./**`, which means all the files inside the current directory and subdirectories will be processed. **Should be passed in quotes in linux to be treated as a string.** One more thing: `--cwd /home/user/website --pattern './**'` and `--cwd /home/user --pattern './website/**'` means different things. In the second case, all the file names will have `website/` prefix comparing to the results of the first case.
 ```
 --gzip
 ```
-*Optional.* Indicates whether the content should be gzipped. A corresponding `Content-Encoding: gzip` header added to uploading objects. If an array of extensions passed, only matching files will be gzipped, otherwise all the files are gzipped. Array should be represented as a semicolon-separated list of extensions without dots. Example: `--gzip 'html;js;css'`.
+*Optional.* Indicates whether the content should be gzipped. A corresponding `Content-Encoding: gzip` header is added to objects being uploaded. If an array of extensions passed, only matching files will be gzipped. Array should be represented as a semicolon-separated list of extensions without dots. Example: `--gzip 'html;js;css'`.
 ```
 --profile
 ```
-*Optional.* Name of AWS profile to be used by AWS SDK. See [AWS Docs](https://docs.aws.amazon.com/cli/latest/topic/config-vars.html). If a region is specified in credentials file under profile, it takes precedence over `--region` value
+*Optional.* Name of AWS profile to be used by AWS SDK. See [AWS Docs](https://docs.aws.amazon.com/cli/latest/topic/config-vars.html). If a region is specified in the credentials file under profile, it takes precedence over `--region` value
 ```
 --region
 ```
@@ -50,17 +50,17 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 *Optional.* Id of CloudFront distribution to invalidate.
 ```
---cf-inv-paths
+--cf-inv-paths /about;/home
 ```
 *Optional.* Semicolon-separated list of paths to invalidate in CloudFront. Example: '/images/image1.jpg;/assets/\*'. Default value is '/\*'.
 ```
 --ignore-map
 ```
-*Optional.* Dictionary of files and correspondent hashes will be ignored upon difference computation. This is helpful if state of S3 bucket was changed manually (not through s3-redeploy script) but dictionary remained the same. In this case, the dictionary state will be omitted during computation and at the same time **a new dictionary will be computed and uploaded to S3** so it could be used in further invocation
+*Optional.* Dictionary of files and correspondent hashes will be ignored upon difference computation. This is helpful if state of S3 bucket was changed manually (not through s3-redeploy script) but the dictionary hasn't changed. In this case, the dictionary state will be omitted during computation and at the same time **a new dictionary will be computed and uploaded to S3** so it could be used in further invocations
 ```
 --no-map
 ```
-*Optional.* Use this flag to store and use no file hashes dictionary at all. Each script invocation will seek through the whole bucket and gather ETags. **If bucket already contains a dictionary file, it will remain as is but won't be used**
+*Optional.* Use this flag to store and use no file hashes dictionary at all. Each script invocation will seek through the whole bucket and gather ETags. **If bucket already contains a dictionary file, it will remain as is but won't be used. You have to remove it manually in order to get rid of it**
 ```
 --no-rm
 ```
@@ -68,11 +68,11 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 --concurrency X
 ```
-*Optional.* Parameter sets the maximum possible amount of network / file system operations to be ran in parallel. Defaults to 5. *Note:* it is safe to run file system operations in parallel due to streams usage
+*Optional.* Sets the maximum possible amount of network / file system operations to be ran in parallel. In particular, it means that files uploading will be performed in parallel. The same is true for file system operations. Defaults to 5. *Note:* it is safe to run file system operations in parallel due to streams API usage
 ```
 --file-name
 ```
-*Optional.* Utility uploads a file, containing md5 hashes, upon folder sync. This file is used during the sync operation and lets to minimize amount of network requests and computations. Defaults to `_s3-rd.<bucket name>.json`
+*Optional.* Utility uploads a file containing md5 hashes upon folder sync. This file is used during the sync operation and lets to minimize amount of network requests and computations. Defaults to `_s3-rd.<bucket name>.json`. **If file name changes, the file with old name will still remain in the bucket until a new sync performed**
 ```
 --cache X
 ```
@@ -82,11 +82,22 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 
 Package provides an ability to sync a local folder with an Amazon S3 bucket and create an invalidation for a CloudFront distribution. Extremely helpful if you use S3 bucket as a hosting for your website.
 
-The module itself may be both executed as a script from the command line and imported as a module into the application. The idea was inspired by [s3-deploy](https://www.npmjs.com/package/s3-deploy) but another approach to work out the sync process was taken. The set of functionality is also slightly different.
+The package has a really small amount of only well known and handy dependencies. It also uses no transpilers, etc., which means the size of package is pretty small and contains no garbage dependencies.
+
+The idea was inspired by [s3-deploy](https://www.npmjs.com/package/s3-deploy) but another approach to work out the sync process has been taken. The set of functionality is also slightly different. Feel free to submit and issue or a feature request if something crucial is missing.
 
 #### How it works
 
-In order to decrease amount of S3 invocations and increase processing speed, MD5 hashes dictionary is built for all the local files. The dictionary is uploaded along with other files and is used during further updates. Instead of querying S3 for ETags, the S3-stored dictionary is compared with local one. Thus, only changed files are updated.
+The script lets one to sync a local state to S3 bucket and, if needed, invalidate a CloudFront distribution by id. All the manipulations are performed through AWS SDK for Node.js. Script computes MD5 hashes for glob pattern compatible files and compares it to hashes of S3-stored objects. Based on hashes, it computes difference and uploads / removes only certain files.
+
+Here are the key features:
+* A dictionary of file hashes, which mirrors state of the file system, is built and uploaded to the bucket. It increases processing speed and decreases amount of round trips to S3. It also lets to distinguish states difference. As it contains only file hashes, it is completely secure to store it. Anyway, you still able to omit dictionary usage
+* There are no unnecessary updates. If ETag (MD5) of file in S3 is equal to MD5 of locally stored file, it won't be uploaded. A dictionary is handy here, there is no need to query for ETag of each file as we have them all in single file already
+* Dictionary usage lets one to abstract from AWS S3 ETags, which may be or may be not a MD5 hash. File, being computed for a local state, guarantees that all the changes will be spotted correctly
+* Network / file system operations are done in parallel. You are still able to do everything sequentially using `concurrency` parameter
+* There is an ability to set S3 object Cache-Control header using `--cache` parameter
+* `--gzip` parameter lets one to control files compression
+* Mime types are automatically computed by extension and set for each S3 object
 
 **IMPORTANT:** If you change the state of bucket manually, the contents of the dictionary will not be updated. Thus, perform all the bucket update operations through the script or consider manual dictionary removal / `--ignore-map` flag usage, which will let the dictionary to be computed again and stored on the next script invocation.
 
