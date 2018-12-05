@@ -1,9 +1,11 @@
 'use strict';
 
 class CommonError extends Error {
-  constructor(message, additionalInfo) {
+  constructor(message, originalError) {
     super(message);
-    Object.assign(this, additionalInfo);
+    if (originalError){
+      this.originalError = originalError;
+    }
     Error.captureStackTrace(this, CommonError);
   }
 }

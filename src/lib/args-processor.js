@@ -4,13 +4,13 @@
  * Transform array with arguments into a map of values
  * @returns {Object}
  */
-module.exports.parseCmdArgs = args => {
+module.exports.parse = args => {
   const params = {};
   for (let i = 0; i < args.length; i++) {
     const cmdValue = args[i];
     const isIdent = cmdValue.startsWith('--');
     if (isIdent) {
-      const key = module.exports.dashToCamel(cmdValue.slice(2));
+      const key = dashToCamel(cmdValue.slice(2));
       const nextCmdValue = args[i + 1];
       const isCurBool = !nextCmdValue || nextCmdValue.startsWith('--');
       params[key] = isCurBool ? true : nextCmdValue;
@@ -39,7 +39,7 @@ module.exports.processParams = params => {
   result.cwd = params.cwd || '';
 
   if (result.concurrency) {
-    if (!module.exports.isPositiveInteger(result.concurrency)) {
+    if (!isPositiveInteger(result.concurrency)) {
       throw new Error('Concurrency value should be a positive integer');
     }
     result.concurrency = parseInt(params.concurrency, 10);
@@ -68,7 +68,7 @@ module.exports.processParams = params => {
  * @param str
  * @returns {String}
  */
-module.exports.dashToCamel = str => {
+const dashToCamel = module.exports._dashToCamel = str => {
   if (!str) return '';
 
   const parts = str.split('-');
@@ -84,5 +84,5 @@ module.exports.dashToCamel = str => {
  * @param val
  * @returns {boolean}
  */
-module.exports.isPositiveInteger =
+const isPositiveInteger = module.exports._isPositiveInteger =
   val => !isNaN(val) && String(parseInt(val, 10)) === String(val) && parseInt(val, 10) > 0;

@@ -88,14 +88,3 @@ module.exports.shouldGzip = (fileName, gzip) => {
     }
   }
 };
-
-module.exports.configureAwsSdk = (awsSdk, params) => {
-  const awsOptions = {
-    sslEnabled: true,
-    region: params.region,
-  };
-  awsSdk.config.update(awsOptions);
-  if (params.profile) {
-    awsSdk.config.credentials = new awsSdk.SharedIniFileCredentials({ profile: params.profile });
-  }
-};
