@@ -1,17 +1,17 @@
 'use strict';
 
 /**
- * Transform process.argv into a map of values
+ * Transform array with arguments into a map of values
  * @returns {Object}
  */
-module.exports.parseCmdArgs = () => {
+module.exports.parseCmdArgs = args => {
   const params = {};
-  for (let i = 2; i < process.argv.length; i++) {
-    const cmdValue = process.argv[i];
+  for (let i = 0; i < args.length; i++) {
+    const cmdValue = args[i];
     const isIdent = cmdValue.startsWith('--');
     if (isIdent) {
       const key = module.exports.dashToCamel(cmdValue.slice(2));
-      const nextCmdValue = process.argv[i + 1];
+      const nextCmdValue = args[i + 1];
       const isCurBool = !nextCmdValue || nextCmdValue.startsWith('--');
       params[key] = isCurBool ? true : nextCmdValue;
       if (!isCurBool) i++;
