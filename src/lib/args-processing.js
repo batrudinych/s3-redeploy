@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * Transform process.argv into a map of values
  * @returns {Object}
@@ -17,6 +19,7 @@ module.exports.parseCmdArgs = () => {
   }
   return params;
 };
+
 /**
  * Sanitize and validate parameters
  * @param params
@@ -36,7 +39,7 @@ module.exports.processParams = params => {
   result.cwd = params.cwd || '';
 
   if (result.concurrency) {
-    if (!module.exports.isPositiveInteger(result.concurrency)){
+    if (!module.exports.isPositiveInteger(result.concurrency)) {
       throw new Error('Concurrency value should be a positive integer');
     }
     result.concurrency = parseInt(params.concurrency, 10);
@@ -59,15 +62,16 @@ module.exports.processParams = params => {
 
   return result;
 };
+
 /**
  * Transform string in dash case to camel case
- * @param string
- * @returns {string}
+ * @param str
+ * @returns {String}
  */
-module.exports.dashToCamel = string => {
-  if (!string) return '';
+module.exports.dashToCamel = str => {
+  if (!str) return '';
 
-  const parts = string.split('-');
+  const parts = str.split('-');
   let result = parts.splice(0, 1)[0].toLowerCase();
   for (const part of parts) {
     result += part[0].toUpperCase() + part.substring(1).toLowerCase();
@@ -75,4 +79,10 @@ module.exports.dashToCamel = string => {
   return result;
 };
 
-module.exports.isPositiveInteger = val => !isNaN(val) && String(parseInt(val, 10)) === String(val) && parseInt(val, 10) > 0;
+/**
+ * Checks whether value represents a positive integer or not
+ * @param val
+ * @returns {boolean}
+ */
+module.exports.isPositiveInteger =
+  val => !isNaN(val) && String(parseInt(val, 10)) === String(val) && parseInt(val, 10) > 0;

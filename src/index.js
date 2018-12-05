@@ -1,23 +1,26 @@
+'use strict';
+
 const aws = require('aws-sdk');
 const co = require('co');
 const path = require('path');
 
-const { processParams } = require('./lib/args-processor');
+const { processParams } = require('./lib/args-processing');
 const { invalidate } = require('./lib/cf-helper');
 const s3Helper = require('./lib/s3-helper');
-const { globAsync, computeLocalFilesStats, detectFileChanges } = require('./lib/utils');
-const CommonError = require('./lib/common-error');
+const { globAsync, configureAwsSdk } = require('./lib/utils');
+const { computeLocalFilesStats, detectFileChanges } = require('./lib/hash-helper');
+const { CommonError } = require('./lib/errors');
 
 module.exports = co.wrap(function* (params) {
-  const opts = processParams(params);
+  const paramsObj = processParams(params);
   console.log('Execution starts with the following params:');
-  console.log(JSON.stringify(opts, null, 2));
+  console.log(JSON.stringify(paramsObj, null, 2));
 
-  const basePath = path.resolve(process.cwd(), opts.cwd);
+  const basePath = path.resolve(process.cwd(), paramsObj.cwd);
   console.log('Applying glob pattern, base path is:', basePath);
   let globResult;
   try {
-    globResult = yield globAsync(opts.pattern, { cwd: basePath });
+    globResult = yield globAsync(paramsObj.pattern, { cwd: basePath });
   } catch (e) {
     throw new CommonError('Search files by glob operation failed', { cause: e });
   }
@@ -32,21 +35,14 @@ module.exports = co.wrap(function* (params) {
   }
   console.log('Complete');
 
-  const awsOptions = {
-    sslEnabled: true,
-    region: opts.region,
-  };
-  aws.config.update(awsOptions);
-  if (opts.profile) {
-    aws.config.credentials = new aws.SharedIniFileCredentials({ profile: opts.profile });
-  }
   const s3Client = new aws.S3();
-  const s3HelperInstance = s3Helper.getInstance(s3Client, opts);
+  configureAwsSdk(aws, paramsObj);
+  const s3HelperInstance = s3Helper.getInstance(s3Client, paramsObj);
 
   console.log('Computing map of hashes for local files');
   let localHashesMap;
   try {
-    localHashesMap = yield computeLocalFilesStats(fileNames, basePath, opts.concurrency);
+    localHashesMap = yield computeLocalFilesStats(fileNames, basePath, paramsObj.concurrency);
   } catch (e) {
     throw new CommonError('Local files hash map computation failed', { cause: e });
   }
@@ -81,7 +77,7 @@ module.exports = co.wrap(function* (params) {
     console.log('No files to be uploaded');
   }
 
-  if (!opts.noRm) {
+  if (!paramsObj.noRm) {
     const removalNeeded = Object.keys(toDelete).length;
     if (removalNeeded) {
       console.log('%s files to be removed. Removing files', removalNeeded);
@@ -96,12 +92,12 @@ module.exports = co.wrap(function* (params) {
     }
   } else {
     console.log('Skipping removal as correspondent flag is set');
-    if (!opts.noMap) {
+    if (!paramsObj.noMap) {
       Object.assign(localHashesMap, toDelete);
     }
   }
 
-  if (!opts.noMap) {
+  if (!paramsObj.noMap) {
     console.log('Saving map of file hashes');
     try {
       yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
@@ -111,11 +107,11 @@ module.exports = co.wrap(function* (params) {
     console.log('Complete');
   }
 
-  if (opts.cfDistId) {
-    console.log('Creating CloudFront invalidation for', opts.cfDistId);
+  if (paramsObj.cfDistId) {
+    console.log('Creating CloudFront invalidation for', paramsObj.cfDistId);
     let invalidateResponse;
     try {
-      invalidateResponse = yield invalidate(new aws.CloudFront(), opts.cfDistId, opts.cdInvPaths);
+      invalidateResponse = yield invalidate(new aws.CloudFront(), paramsObj.cfDistId, paramsObj.cdInvPaths);
     } catch (e) {
       throw new CommonError('CloudFront invalidation creation failed', { cause: e });
     }

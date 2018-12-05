@@ -1,3 +1,5 @@
+'use strict';
+
 class CommonError extends Error {
   constructor(message, additionalInfo) {
     super(message);
@@ -6,4 +8,6 @@ class CommonError extends Error {
   }
 }
 
-module.exports = CommonError;
+module.exports = {
+  CommonError,
+};

@@ -1,4 +1,6 @@
-const { parallel, gzipStream, gzipAsync, gunzipAsync } = require('./utils');
+'use strict';
+
+const { parallel, gzipStream, gzipAsync, gunzipAsync, shouldGzip } = require('./utils');
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime');
@@ -32,7 +34,8 @@ class S3Helper {
     }
     return parallel(
       batches,
-      batch => this._s3Client.deleteObjects(Object.assign({ Delete: { Objects: batch } }, this._s3BaseParams)).promise(),
+      batch =>
+        this._s3Client.deleteObjects(Object.assign({ Delete: { Objects: batch } }, this._s3BaseParams)).promise(),
       this._concurrency
     );
   }
@@ -73,7 +76,10 @@ class S3Helper {
   storeRemoteHashesMap(map) {
     const mapUploadParams = Object.assign({ ContentEncoding: 'gzip' }, this._s3BaseParams);
     return gzipAsync(JSON.stringify(map))
-      .then(buff => this._s3Client.putObject(Object.assign({ Key: this._mapFileName, Body: buff }, mapUploadParams)).promise());
+      .then(buff => this._s3Client.putObject(Object.assign({
+        Key: this._mapFileName,
+        Body: buff,
+      }, mapUploadParams)).promise());
   }
 
   /**
@@ -119,7 +125,7 @@ class S3Helper {
    * @private
    */
   _uploadObject(fileName, fileData, basePath) {
-    const shouldBeZipped = this._shouldGzip(fileName);
+    const shouldBeZipped = shouldGzip(fileName, this._gzip);
     const contentType = mime.getType(fileName);
     const fStream = fs.createReadStream(path.join(basePath, fileName));
     const putParams = Object.assign({
@@ -142,23 +148,6 @@ class S3Helper {
     }
 
     return this._s3Client.putObject(putParams).promise();
-  }
-
-  /**
-   * A helper-function to verify if file needs to be zipped
-   * @param fileName
-   * @returns {Boolean}
-   * @private
-   */
-  _shouldGzip(fileName) {
-    if (this._gzip) {
-      if (Array.isArray(this._gzip)) {
-        const extName = path.extname(fileName).substring(1).toLowerCase();
-        if (extName) return this._gzip.includes(extName);
-      } else {
-        return true;
-      }
-    }
   }
 }
 

@@ -105,6 +105,7 @@ MIT
 
 ## TODO:
 * fix versions in package.json
+* get rid of module.exports
 * precommit hook
 * unit tests
 * add Travis and coverall + badges
