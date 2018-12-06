@@ -3,7 +3,7 @@
 class CommonError extends Error {
   constructor(message, originalError) {
     super(message);
-    if (originalError){
+    if (originalError) {
       this.originalError = originalError;
     }
     Error.captureStackTrace(this, CommonError);

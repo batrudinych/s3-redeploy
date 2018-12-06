@@ -11,7 +11,7 @@ module.exports.invalidate = (cfClient, distId, paths = ['/*']) =>
   cfClient.createInvalidation({
     DistributionId: distId,
     InvalidationBatch: {
-      CallerReference: `s3-redeploy-${Date.now().toString().slice(0, -3)}`,
+      CallerReference: `s3-redeploy-${Date.now()}`,
       Paths: {
         Quantity: paths.length,
         Items: paths,

@@ -5,7 +5,7 @@
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
   "scripts": {
-    "lint": "eslint src/ bin/",
+    "lint": "eslint src/ bin/ test/",
     "test": "jest"
   },
   "repository": {

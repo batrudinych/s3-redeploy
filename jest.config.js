@@ -1,8 +1,21 @@
+'use strict';
+
 module.exports = {
   bail: false,
-  moduleFileExtensions: [ 'js' ],
-  rootDir: 'test',
+  clearMocks: true,
+  moduleFileExtensions: ['js'],
   testEnvironment: 'node',
-  testMatch: [ '**/*.spec.js' ],
-  testPathIgnorePatterns: [ '/node_modules/' ],
+  testMatch: ['**/test/**.spec.js'],
+  collectCoverage: true,
+  collectCoverageFrom: ['**/src/**.js'],
+  coverageReporters: ['text'],
+  coverageDirectory: 'test/coverage',
+  coverageThreshold: {
+    global: {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100,
+    },
+  },
 };

@@ -78,6 +78,8 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 *Optional.* Sets `Cache-Control: max-age=X` for uploaded files. Must be passed in seconds. By default nothing is set.
 
+A simple lightweight validation process is implemented, but it is still possible to pass arguments in wrong format, e.g. `--file-name` is not checked against regex.
+
 ## Backgorund
 
 Package provides an ability to sync a local folder with an Amazon S3 bucket and create an invalidation for a CloudFront distribution. Extremely helpful if you use S3 bucket as a hosting for your website.
@@ -116,7 +118,6 @@ MIT
 
 ## TODO:
 * fix versions in package.json
-* get rid of module.exports
 * precommit hook
 * unit tests
 * add Travis and coverall + badges

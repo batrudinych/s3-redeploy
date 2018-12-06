@@ -8,10 +8,9 @@ const { parallel, fsStatAsync } = require('./utils');
 /**
  * Calculate file hash using stream API
  * @param path - Path to the file
- * @param alg - Algorithm to be used
  * @returns {Promise<Array>} - Promise, which resolves with a Uint array, containing file hash
  */
-const computeFileHash = module.exports._computeFileHash = path => new Promise((resolve, reject) => {
+module.exports._computeFileHash = path => new Promise((resolve, reject) => {
   const hash = crypto.createHash('md5');
   const fileStream = fs.createReadStream(path);
   fileStream
@@ -44,7 +43,7 @@ module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurre
     fileName => {
       const filePath = path.join(basePath, fileName);
       return fsStatAsync(filePath)
-        .then(fstats => fstats.isFile() ? computeFileHash(filePath) : null)
+        .then(fstats => fstats.isFile() ? module.exports._computeFileHash(filePath) : null)
         .then(hash => {
           if (hash) {
             localFilesStats[fileName] = {

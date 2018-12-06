@@ -88,3 +88,27 @@ module.exports.shouldGzip = (fileName, gzip) => {
     }
   }
 };
+
+/**
+ * Transform string in dash case to camel case
+ * @param str
+ * @returns {String}
+ */
+module.exports.dashToCamel = str => {
+  if (!str) return '';
+
+  const parts = str.split('-');
+  let result = parts.splice(0, 1)[0].toLowerCase();
+  for (const part of parts) {
+    result += part[0].toUpperCase() + part.substring(1).toLowerCase();
+  }
+  return result;
+};
+
+/**
+ * Checks whether value represents a positive integer or not
+ * @param val
+ * @returns {boolean}
+ */
+module.exports.isPositiveInteger =
+  val => !isNaN(val) && String(parseInt(val, 10)) === String(val) && parseInt(val, 10) > 0;

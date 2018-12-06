@@ -9,12 +9,6 @@
     "jest": true
   },
 
-  "globals": {
-    "document": false,
-    "navigator": false,
-    "window": false
-  },
-
   "rules": {
     "strict": ["error", "global"],
     "accessor-pairs": "error",

@@ -1,5 +1,7 @@
 'use strict';
 
+const { dashToCamel, isPositiveInteger } = require('./utils');
+const { CommonError } = require('./errors');
 /**
  * Transform array with arguments into a map of values
  * @returns {Object}
@@ -27,10 +29,10 @@ module.exports.parse = args => {
  */
 module.exports.processParams = params => {
   if (!params.bucket) {
-    throw new Error('Bucket name should be set');
+    throw new CommonError('Bucket name should be set');
   }
   if (params.bucket.includes('\\') || params.bucket.includes('/')) {
-    throw new Error('Bucket name should contain no slashes');
+    throw new CommonError('Bucket name should contain no slashes');
   }
 
   const result = Object.assign({}, params);
@@ -40,7 +42,7 @@ module.exports.processParams = params => {
 
   if (result.concurrency) {
     if (!isPositiveInteger(result.concurrency)) {
-      throw new Error('Concurrency value should be a positive integer');
+      throw new CommonError('Concurrency value should be a positive integer');
     }
     result.concurrency = parseInt(params.concurrency, 10);
   } else {
@@ -62,27 +64,3 @@ module.exports.processParams = params => {
 
   return result;
 };
-
-/**
- * Transform string in dash case to camel case
- * @param str
- * @returns {String}
- */
-const dashToCamel = module.exports._dashToCamel = str => {
-  if (!str) return '';
-
-  const parts = str.split('-');
-  let result = parts.splice(0, 1)[0].toLowerCase();
-  for (const part of parts) {
-    result += part[0].toUpperCase() + part.substring(1).toLowerCase();
-  }
-  return result;
-};
-
-/**
- * Checks whether value represents a positive integer or not
- * @param val
- * @returns {boolean}
- */
-const isPositiveInteger = module.exports._isPositiveInteger =
-  val => !isNaN(val) && String(parseInt(val, 10)) === String(val) && parseInt(val, 10) > 0;
