@@ -13,19 +13,21 @@ const { parallel, fsStatAsync } = require('./utils');
 module.exports._computeFileHash = path => new Promise((resolve, reject) => {
   const hash = crypto.createHash('md5');
   const fileStream = fs.createReadStream(path);
+  let errorHappened = false;
   fileStream
-    .on('error', e => {
-      fileStream.close();
-      reject(e);
-    })
+    .on('error', reject)
     .pipe(hash)
     .on('error', e => {
+      errorHappened = true;
       fileStream.close();
+      hash.end();
       reject(e);
     })
     .on('finish', () => {
-      hash.end();
-      resolve(hash.read());
+      if (!errorHappened) {
+        hash.end();
+        resolve(hash.read());
+      }
     });
 });
 
@@ -38,22 +40,25 @@ module.exports._computeFileHash = path => new Promise((resolve, reject) => {
  */
 module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurrency) {
   const localFilesStats = {};
+  const fileNameProcessor = module.exports._getFileNameProcessor(basePath, localFilesStats);
   yield parallel(
     fileNames,
-    fileName => {
-      const filePath = path.join(basePath, fileName);
-      return fsStatAsync(filePath)
-        .then(fstats => fstats.isFile() ? module.exports._computeFileHash(filePath) : null)
-        .then(hash => {
-          if (hash) {
-            localFilesStats[fileName] = {
-              eTag: `"${hash.toString('hex')}"`,
-              contentMD5: hash.toString('base64'),
-            };
-          }
-        });
-    },
+    fileNameProcessor,
     concurrency
   );
   return localFilesStats;
+};
+
+module.exports._getFileNameProcessor = (basePath, localFilesStats) => fileName => {
+  const filePath = path.join(basePath, fileName);
+  return fsStatAsync(filePath)
+    .then(fstats => fstats.isFile() ? module.exports._computeFileHash(filePath) : null)
+    .then(hash => {
+      if (hash) {
+        localFilesStats[fileName] = {
+          eTag: `"${hash.toString('hex')}"`,
+          contentMD5: hash.toString('base64'),
+        };
+      }
+    });
 };

@@ -97,7 +97,7 @@ module.exports.shouldGzip = (fileName, gzip) => {
 module.exports.dashToCamel = str => {
   if (!str) return '';
 
-  const parts = str.split('-');
+  const parts = str.split('-').filter(Boolean);
   let result = parts.splice(0, 1)[0].toLowerCase();
   for (const part of parts) {
     result += part[0].toUpperCase() + part.substring(1).toLowerCase();

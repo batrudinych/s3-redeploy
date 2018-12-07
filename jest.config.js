@@ -1,8 +1,9 @@
 'use strict';
 
 module.exports = {
-  bail: false,
+  bail: true,
   clearMocks: true,
+  restoreMocks: true,
   moduleFileExtensions: ['js'],
   testEnvironment: 'node',
   testMatch: ['**/test/**.spec.js'],
