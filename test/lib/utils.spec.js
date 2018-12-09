@@ -147,6 +147,49 @@ describe('Utils', () => {
     });
   });
 
+  describe('parallel', () => {
+    test('resolves with empty array if empty array was passed', done => {
+      utils.parallel([], () => {})
+        .then(res => {
+          expect(res).toEqual([]);
+          done();
+        })
+        .catch(done);
+    });
+
+    test('calls mapper function for each argument with default concurrency value', done => {
+      const suffix = 'res_';
+      const mapperFn = jest.fn().mockImplementation(arg => Promise.resolve(suffix + arg));
+      const args = ['arg1', 'arg2', 'arg3'];
+      utils.parallel(args, mapperFn)
+        .then(res => {
+          expect(mapperFn).toBeCalledTimes(args.length);
+          for (let i = 0; i < args.length; i++) {
+            expect(mapperFn.mock.calls[i]).toEqual([args[i]]);
+          }
+          expect(res).toEqual(args.map(el => suffix + el));
+          done();
+        })
+        .catch(done);
+    });
+
+    test('calls mapper function for each argument with passed concurrency value', done => {
+      const suffix = 'res_';
+      const mapperFn = jest.fn().mockImplementation(arg => Promise.resolve(suffix + arg));
+      const args = ['arg1', 'arg2', 'arg3'];
+      utils.parallel(args, mapperFn, 10)
+        .then(res => {
+          expect(mapperFn).toBeCalledTimes(args.length);
+          for (let i = 0; i < args.length; i++) {
+            expect(mapperFn.mock.calls[i]).toEqual([args[i]]);
+          }
+          expect(res).toEqual(args.map(el => suffix + el));
+          done();
+        })
+        .catch(done);
+    });
+  });
+
   describe('shouldGzip', () => {
     test('returns nothing if gzip is false', () => {
       expect(utils.shouldGzip(__filename, false)).toEqual(undefined);

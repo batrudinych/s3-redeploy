@@ -2,7 +2,7 @@
 
 Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.
 
-# Module status: WIP until 0.1.0 release
+# Module status: WIP until 1.0.0 release
 
 ## Usage
 
@@ -32,7 +32,7 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 ```
 --pattern
 ```
-*Optional.* Glob pattern, applied to the `cwd` directory. Defaults to `./**`, which means all the files inside the current directory and subdirectories will be processed. **Should be passed in quotes in linux to be treated as a string.** One more thing: `--cwd /home/user/website --pattern './**'` and `--cwd /home/user --pattern './website/**'` means different things. In the second case, all the file names will have `website/` prefix comparing to the results of the first case.
+*Optional.* Glob pattern, applied to the `cwd` directory. Defaults to `./**`, which means all the files inside the current directory and subdirectories will be processed. **Should be passed in quotes in linux to be treated as a string.** One more thing: `--cwd /home/user/website --pattern './**'` and `--cwd /home/user --pattern './website/**'` means different things. In the second case, all the file names will have `website/` prefix comparing to the results of the first case. **If no files match the pattern, the script will exit and leave bucket as is. This is done in order to prevent occasional bucket clearance due to wrong `pattern`/`cwd` combination**
 ```
 --gzip
 ```

@@ -2,14 +2,15 @@
 
 module.exports = {
   bail: true,
+  silent: true,
   clearMocks: true,
   restoreMocks: true,
-  moduleFileExtensions: ['js'],
+  moduleFileExtensions: ['js', 'json'],
   testEnvironment: 'node',
   testMatch: ['**/test/**.spec.js'],
   collectCoverage: true,
   collectCoverageFrom: ['**/src/**.js'],
-  coverageReporters: ['text'],
+  coverageReporters: ['text', 'html'],
   coverageDirectory: 'test/coverage',
   coverageThreshold: {
     global: {
