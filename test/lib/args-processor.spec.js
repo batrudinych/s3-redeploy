@@ -1,8 +1,9 @@
 'use strict';
 
-jest.mock('../../src/lib/utils');
 const utils = require('../../src/lib/utils');
 const argsProcessor = require('../../src/lib/args-processor');
+
+jest.mock('../../src/lib/utils');
 
 describe('Arguments processor', () => {
   describe('parse', () => {
@@ -52,7 +53,7 @@ describe('Arguments processor', () => {
   });
 
   describe('processParams', () => {
-    utils.isPositiveInteger.mockImplementation(() => true);
+    utils.isPositiveInteger.mockReturnValue(true);
 
     const params = {
       bucket: 'bucket-name',
@@ -126,7 +127,7 @@ describe('Arguments processor', () => {
 
     test('throws if concurrency is not a positive integer', () => {
       const inputParams = Object.assign({}, params);
-      utils.isPositiveInteger.mockImplementation(() => false);
+      utils.isPositiveInteger.mockReturnValue(false);
       try {
         argsProcessor.processParams(inputParams);
         throw new Error('Should have thrown');

@@ -69,14 +69,14 @@ module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap)
  * given CloudFront client instance
  * @param cfClient
  * @param cfDistId
- * @param cdInvPaths
+ * @param cfInvPaths
  * @returns {*}
  */
-module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cdInvPaths }) {
+module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInvPaths }) {
   console.log('Creating CloudFront invalidation for', cfDistId);
   let invalidateResponse;
   try {
-    invalidateResponse = yield invalidate(cfClient, cfDistId, cdInvPaths);
+    invalidateResponse = yield invalidate(cfClient, cfDistId, cfInvPaths);
   } catch (e) {
     throw new CommonError('CloudFront invalidation creation failed', e);
   }

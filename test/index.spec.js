@@ -1,12 +1,6 @@
 'use strict';
 
 const path = require('path');
-
-jest.mock('aws-sdk');
-jest.mock('../src/lib/args-processor');
-jest.mock('../src/steps');
-jest.mock('../src/lib/s3-helper');
-
 const main = require('../src');
 const aws = require('aws-sdk');
 const { getInstance } = require('../src/lib/s3-helper');
@@ -22,6 +16,11 @@ const {
   configureAwsSdk,
 } = require('../src/steps');
 const { processParams } = require('../src/lib/args-processor');
+
+jest.mock('aws-sdk');
+jest.mock('../src/lib/args-processor');
+jest.mock('../src/steps');
+jest.mock('../src/lib/s3-helper');
 
 describe('Main', () => {
   let params;
@@ -72,8 +71,8 @@ describe('Main', () => {
     const fileNames = ['/folder/file1'];
     const localHM = { entry1: 'value1' };
     const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry3: 'value3'};
-    const toDelete = { entry4: 'value4'};
+    const toUpload = { entry3: 'value3' };
+    const toDelete = { entry4: 'value4' };
     const s3ClienStub = {
       method: () => {
       },
@@ -118,8 +117,8 @@ describe('Main', () => {
     const fileNames = ['/folder/file1'];
     const localHM = { entry1: 'value1' };
     const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry1: 'value1'};
-    const toDelete = { entry2: 'value2'};
+    const toUpload = { entry1: 'value1' };
+    const toDelete = { entry2: 'value2' };
     const resMap = Object.assign({}, toUpload, toDelete);
     const s3ClienStub = {
       method: () => {
@@ -167,8 +166,8 @@ describe('Main', () => {
     const fileNames = ['/folder/file1'];
     const localHM = { entry1: 'value1' };
     const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry1: 'value1'};
-    const toDelete = { entry2: 'value2'};
+    const toUpload = { entry1: 'value1' };
+    const toDelete = { entry2: 'value2' };
     const s3ClienStub = {
       method: () => {
       },
@@ -214,8 +213,8 @@ describe('Main', () => {
     const fileNames = ['/folder/file1'];
     const localHM = { entry1: 'value1' };
     const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry3: 'value3'};
-    const toDelete = { entry4: 'value4'};
+    const toUpload = { entry3: 'value3' };
+    const toDelete = { entry4: 'value4' };
     const s3ClienStub = {
       method: () => {
       },

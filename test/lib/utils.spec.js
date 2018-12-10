@@ -2,12 +2,11 @@
 
 const stream = require('stream');
 const zlib = require('zlib');
-const path = require('path');
 const fs = require('fs');
 const utils = require('../../src/lib/utils');
+const glob = require('glob');
 
 jest.mock('glob');
-const glob = require('glob');
 
 describe('Utils', () => {
   describe('gzipStream', () => {
