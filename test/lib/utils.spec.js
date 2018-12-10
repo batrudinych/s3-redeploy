@@ -20,8 +20,10 @@ describe('Utils', () => {
       gzipStreamMock._write = () => {
       };
       readStreamMock.pipe = jest.fn(() => readStreamMock);
-      jest.spyOn(zlib, 'createGzip').mockReturnValue(gzipStreamMock);
+      const originalCreateGzip = zlib.createGzip;
+      Object.defineProperty(zlib, 'createGzip', { value: () => gzipStreamMock });
       const outputStream = utils.gzipStream(readStreamMock);
+      Object.defineProperty(zlib, 'createGzip', { value: originalCreateGzip });
       expect(outputStream).toEqual(readStreamMock);
       expect(readStreamMock.pipe).toBeCalledTimes(1);
       expect(readStreamMock.pipe).toBeCalledWith(gzipStreamMock);

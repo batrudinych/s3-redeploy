@@ -118,14 +118,14 @@ MIT
 
 ## TODO:
 * fix versions in package.json
-* precommit hook
-* unit tests
 * add Travis and coverall + badges
-* use maps instead of objects
-* add verbose / silent flags and improve logging
+* improve logging
+### Would be nice to do in future:
 * build redirect objects
-* check on Windows
+* add verbose / silent flags
+* verify work with paths, etc. on Windows
+* use maps instead of objects
 
-Additional things to consider:
+### Additional things to consider:
 * check what could be done with versions and prefixes for S3 objects
 * take a look at ACL:private for hash map
