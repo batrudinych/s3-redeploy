@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/denis-fatkhudinov/s3-redeploy.svg?branch=master)](https://travis-ci.org/denis-fatkhudinov/s3-redeploy)
-[![Coverage Status](https://coveralls.io/repos/github/denis-fatkhudinov/s3-redeploy/badge.svg?branch=master)](https://coveralls.io/github/denis-fatkhudinov/s3-redeploy?branch=master)
+[![Build Status](https://travis-ci.org/batrudinych/s3-redeploy.svg?branch=master)](https://travis-ci.org/batrudinych/s3-redeploy)
+[![Coverage Status](https://coveralls.io/repos/github/batrudinych/s3-redeploy/badge.svg?branch=master)](https://coveralls.io/github/batrudinych/s3-redeploy?branch=master)
 [![](https://img.shields.io/node/v/s3-redeploy.svg)](https://www.npmjs.com/package/s3-redeploy)
 [![](https://img.shields.io/npm/v/s3-redeploy.svg)](https://www.npmjs.com/package/s3-redeploy)
 [![](https://img.shields.io/npm/dw/s3-redeploy.svg)](https://www.npmjs.com/package/s3-redeploy)
