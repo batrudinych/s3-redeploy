@@ -1,6 +1,6 @@
 {
   "name": "s3-redeploy",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
