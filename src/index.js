@@ -9,15 +9,17 @@ const steps = require('./steps');
 
 module.exports = co.wrap(function* (params) {
   const paramsObj = processParams(params);
+  console.log('~~~~~~~~~~~~~~~ s3-redeploy ~~~~~~~~~~~~~~~');
   console.log('Execution starts with the following params:');
   console.log(JSON.stringify(paramsObj, null, 2));
+  console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
 
   paramsObj.basePath = path.resolve(process.cwd(), paramsObj.cwd);
 
   const fileNames = yield steps.applyGlobPattern(paramsObj);
 
   if (!fileNames.length) {
-    console.log('Found no files to process. Exit');
+    console.log('Found no files to process. Exit\n');
     return null;
   }
 
@@ -28,7 +30,7 @@ module.exports = co.wrap(function* (params) {
 
   const remoteHashesMap = yield steps.computeRemoteHashesMap(s3HelperInstance);
 
-  console.log('Computing difference');
+  console.log('► Computing difference\n');
   const { toUpload, toDelete } = steps.detectFileChanges(localHashesMap, remoteHashesMap);
 
   yield steps.uploadObjectsToS3(s3HelperInstance, toUpload, paramsObj);
@@ -36,7 +38,7 @@ module.exports = co.wrap(function* (params) {
   if (!paramsObj.noRm) {
     yield steps.removeExcessFiles(s3HelperInstance, toDelete);
   } else {
-    console.log('Skipping removal as correspondent flag is set');
+    console.log('► Skipping removal as correspondent flag is set');
     if (!paramsObj.noMap) {
       Object.assign(localHashesMap, toDelete);
     }

@@ -1,6 +1,6 @@
 {
   "name": "s3-redeploy",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/denis-fatkhudinov/s3-redeploy.git"
+    "url": "git+https://github.com/batrudinych/s3-redeploy.git"
   },
   "keywords": [
     "s3",
@@ -22,15 +22,15 @@
     "static",
     "hosting"
   ],
-  "author": "@denis-fatkhudinov",
+  "author": "@batrudinych",
   "contributors": [
     "@puzpuzpuz"
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/denis-fatkhudinov/s3-redeploy/issues"
+    "url": "https://github.com/batrudinych/s3-redeploy/issues"
   },
-  "homepage": "https://github.com/denis-fatkhudinov/s3-redeploy#readme",
+  "homepage": "https://github.com/batrudinych/s3-redeploy#readme",
   "engines": {
     "node": ">=6.0.0"
   },

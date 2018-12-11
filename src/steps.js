@@ -15,14 +15,14 @@ const { CommonError } = require('./lib/errors');
  * @returns {Array}
  */
 module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
-  console.log('Applying glob pattern, base path is:', basePath);
+  console.log('► Applying glob pattern, base path is:', basePath);
   let globResult;
   try {
     globResult = yield globAsync(pattern, { cwd: basePath });
   } catch (e) {
     throw new CommonError('Search files by glob operation failed', e);
   }
-  console.log('Complete');
+  console.log('|Complete|\n');
 
   return globResult
     .map(p => path.relative(basePath, path.resolve(basePath, p)))
@@ -37,15 +37,15 @@ module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
 module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
   const removalNeeded = Object.keys(toDelete).length;
   if (removalNeeded) {
-    console.log('%s files to be removed. Removing files', removalNeeded);
+    console.log('► %s files to be removed. Removing', removalNeeded);
     try {
       yield s3HelperInstance.deleteObjects(toDelete);
     } catch (e) {
       throw new CommonError('Files removal failed', e);
     }
-    console.log('Complete');
+    console.log('|Complete|\n');
   } else {
-    console.log('No files to be removed');
+    console.log('► No files to be removed\n');
   }
 };
 
@@ -55,13 +55,13 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
  * @param localHashesMap
  */
 module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap) {
-  console.log('Saving map of file hashes');
+  console.log('► Uploading map of file hashes');
   try {
     yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
   } catch (e) {
     throw new CommonError('Files hash map uploading failed', e);
   }
-  console.log('Complete');
+  console.log('|Complete|\n');
 };
 
 /**
@@ -73,7 +73,7 @@ module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap)
  * @returns {*}
  */
 module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInvPaths }) {
-  console.log('Creating CloudFront invalidation for', cfDistId);
+  console.log('► Creating CloudFront invalidation for', cfDistId);
   let invalidateResponse;
   try {
     invalidateResponse = yield invalidate(cfClient, cfDistId, cfInvPaths);
@@ -81,7 +81,7 @@ module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInv
     throw new CommonError('CloudFront invalidation creation failed', e);
   }
   const invalidationId = invalidateResponse.Invalidation.Id;
-  console.log('Complete-> CloudFront invalidation created:', invalidationId);
+  console.log('|Complete|-> CloudFront invalidation created: %s\n', invalidationId);
   return invalidateResponse;
 };
 
@@ -94,15 +94,15 @@ module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInv
 module.exports.uploadObjectsToS3 = function* (s3HelperInstance, toUpload, { basePath }) {
   const uploadNeeded = Object.keys(toUpload).length;
   if (uploadNeeded) {
-    console.log('%s files to be uploaded. Uploading files', uploadNeeded);
+    console.log('► %s files to be uploaded. Uploading', uploadNeeded);
     try {
       yield s3HelperInstance.uploadObjects(toUpload, basePath);
     } catch (e) {
       throw new CommonError('Files uploading failed', e);
     }
-    console.log('Complete');
+    console.log('|Complete|\n');
   } else {
-    console.log('No files to be uploaded');
+    console.log('► No files to be uploaded\n');
   }
 };
 
@@ -136,6 +136,7 @@ module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
  * @returns {{AWS SDK instance}}
  */
 module.exports.configureAwsSdk = params => {
+  console.log('► Configuring AWS SDK\n');
   const awsOptions = {
     sslEnabled: true,
     region: params.region,
@@ -155,7 +156,7 @@ module.exports.configureAwsSdk = params => {
  * @returns {Object}
  */
 module.exports.computeLocalHashesMap = function* (fileNames, { basePath, concurrency }) {
-  console.log('Computing map of hashes for local files');
+  console.log('► Computing map of hashes for local files');
   let localHashesMap;
   try {
     localHashesMap = yield computeLocalFilesStats(fileNames, basePath, concurrency);
@@ -163,7 +164,7 @@ module.exports.computeLocalHashesMap = function* (fileNames, { basePath, concurr
     throw new CommonError('Local files hash map computation failed', e);
   }
   const localFilesAmount = Object.keys(localHashesMap).length;
-  console.log('Complete-> Found', localFilesAmount, 'files locally');
+  console.log('|Complete|-> Found', localFilesAmount, 'files locally\n');
   return localHashesMap;
 };
 
@@ -173,7 +174,7 @@ module.exports.computeLocalHashesMap = function* (fileNames, { basePath, concurr
  * @returns {*}
  */
 module.exports.computeRemoteHashesMap = function* (s3HelperInstance) {
-  console.log('Computing map of hashes for S3-stored files');
+  console.log('► Computing map of hashes for S3-stored files');
   let remoteHashesMap;
   try {
     remoteHashesMap = yield s3HelperInstance.getRemoteFilesStats();
@@ -181,6 +182,6 @@ module.exports.computeRemoteHashesMap = function* (s3HelperInstance) {
     throw new CommonError('Remote files hash map retrieval / computation failed', e);
   }
   const remoteFilesAmount = Object.keys(remoteHashesMap).length;
-  console.log('Complete-> Found', remoteFilesAmount, 'files in S3');
+  console.log('|Complete|-> Found', remoteFilesAmount, 'files in S3\n');
   return remoteHashesMap;
 };
