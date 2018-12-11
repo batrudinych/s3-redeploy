@@ -1,13 +1,14 @@
 {
   "name": "s3-redeploy",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
   "scripts": {
     "lint": "eslint src/ bin/ test/**/*.spec.js",
     "test": "jest",
-    "test-ci": "npm run lint && npm run test"
+    "test-ci": "npm run lint && npm run test",
+    "cover": "jest --coverage --coverageReporters=text-lcov | coveralls"
   },
   "repository": {
     "type": "git",
@@ -40,6 +41,7 @@
     "mime": "^2.4.0"
   },
   "devDependencies": {
+    "coveralls": "^3.0.2",
     "eslint": "^5.9.0",
     "jest": "^23.6.0"
   },

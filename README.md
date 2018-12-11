@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/denis-fatkhudinov/s3-redeploy.svg?branch=master)](https://travis-ci.org/denis-fatkhudinov/s3-redeploy)
+
+[![Coverage Status](https://coveralls.io/repos/github/denis-fatkhudinov/s3-redeploy/badge.svg?branch=master)](https://coveralls.io/github/denis-fatkhudinov/s3-redeploy?branch=master)
+
 # s3-redeploy
 
 Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.

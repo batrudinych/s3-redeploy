@@ -10,7 +10,7 @@ module.exports = {
   testMatch: ['**/test/**.spec.js'],
   collectCoverage: true,
   collectCoverageFrom: ['**/src/**.js'],
-  coverageReporters: ['text', 'html'],
+  coverageReporters: ['text'],
   coverageDirectory: 'test/coverage',
   coverageThreshold: {
     global: {
