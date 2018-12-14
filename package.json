@@ -1,6 +1,6 @@
 {
   "name": "s3-redeploy",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.",
   "main": "./src/index.js",
   "bin": "./bin/s3-redeploy.js",
@@ -47,6 +47,7 @@
   },
   "files": [
     "bin/",
-    "src/"
+    "src/",
+    "npm-shrinkwrap.json"
   ]
 }

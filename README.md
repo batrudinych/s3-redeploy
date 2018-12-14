@@ -14,14 +14,14 @@ Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributio
 
 npm >= 5.2.0
 ```bash
-$ npx s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
+$ npx s3-redeploy --bucket bucketName --cwd ./folder-to-sync
 ```
 
 npm < 5.2.0
 
 ```bash
 $ npm i --global s3-redeploy
-$ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
+$ s3-redeploy --bucket bucketName --cwd ./folder-to-sync
 ```
 
 #### Options
@@ -36,7 +36,7 @@ $ s3-redeploy --bucket bucketName --pattern './**' --cwd ./folder-to-sync
 | --cf-dist-id   	| no        	| Id of CloudFront distribution to invalidate once sync is completed                                                                                                                                                                                                                                                                                                                                                                      	| -                      	| --cd-dist-id EDFDVBD632BHDS5                                                                                                                 	        |
 | --cf-inv-paths 	| no        	| Semicolon-separated list of paths to invalidate in CloudFront                                                                                                                                                                                                                                                                                                                                                                           	| '/*'                   	| --cf-inv-paths '/about;/help'                                                                                                                	        |
 | --ignore-map   	| no        	| Dictionary of files and correspondent hashes will be ignored upon difference computation during sync process. This is helpful if state of S3 bucket has been changed manually (not through s3-redeploy script) but the dictionary remained unchanged. The dictionary state will be omitted during computation and at the same time **a new dictionary will be computed and uploaded to S3** so it could be used in further invocations. 	| false                  	| --ignore-map                                                                                                                                 	        |
-| --no-map       	| no        	| Use this flag to **store and use no file hashes dictionary** at all. Each script invocation will seek through the whole objects in bucket and gather ETags. **If bucket already contains a dictionary file, it will remain as is but won't be used. You have to remove it manually in order to get rid of it**                                                                                                                          	| false                  	| --no-map                                                                                                                                     	        |
+| --no-map       	| no        	| Use this flag to **store and use no file hashes dictionary** at all. Each script invocation will result in uploading of all the files stored locally. **If bucket already contains a dictionary file, it will remain as is but won't be used. You have to remove it manually in order to get rid of it**                                                                                                                          	| false                  	| --no-map                                                                                                                                     	        |
 | --no-rm        	| no        	| By default all the removed locally files will be also removed from S3 during sync. Use this flag to override default behavior and upload new files / update changed ones only. No files will be removed from S3. At the same time, the file hashes map (if used) will be updated to mirror relevant S3 bucket state properly.                                                                                                           	| false                  	| --no-rm                                                                                                                                      	        |
 | --concurrency  	| no        	| Sets the maximum possible amount of network / file system operations to be ran in parallel. In particular, it means that files uploading will be performed in parallel. The same is true for file system operations. *Note:* it is safe to run file system operations in parallel due to streams API usage                                                                                                                              	| 5                      	| --concurrency 8                                                                                                                              	        |
 | --file-name    	| no        	| Utility by default uploads a file containing md5 hashes upon folder sync. This file is used during the sync operation and lets to minimize amount of network requests and computations. **If file name changes, the file with old name will still remain in the bucket until a new sync performed**                                                                                                                                     	| `_s3-rd.<bucket>.json` 	| --file-name hashes_map.json                                                                                                                  	        |
@@ -46,11 +46,14 @@ A simple lightweight validation process is implemented, but it is still possible
 
 ## Backgorund
 
-Package provides an ability to sync a local folder with an Amazon S3 bucket and create an invalidation for a CloudFront distribution. Extremely helpful if you use S3 bucket as a hosting for your website.
+Package provides an ability to sync a local folder with an Amazon S3 bucket and create an invalidation for a CloudFront distribution.
+Extremely helpful if you use S3 bucket as a hosting for your website.
 
-The package has a really small amount of only well known and handy dependencies. It also uses no transpilers, etc., which means the size of package is pretty small and contains no garbage dependencies.
+The package has a really small amount of only well known and handy dependencies.
+It also uses no transpilers, etc., which means the size of package is pretty small and contains no garbage dependencies.
 
-The idea was inspired by [s3-deploy](https://www.npmjs.com/package/s3-deploy) but another approach to work out the sync process has been taken. The default assumptions and set of functionality is also slightly different. Feel free to submit an issue or a feature request if something crucial is missing.
+The idea was inspired by [s3-deploy](https://www.npmjs.com/package/s3-deploy) but another approach to work out the sync process has been taken.
+The default assumptions and set of functionality is also slightly different. Feel free to submit an issue or a feature request if something crucial is missing.
 
 #### How it works
 
@@ -65,9 +68,13 @@ Single object's ETag is set to file's MD5 upon uploading.
 Along with difference application, the updated map of hashes is uploaded to S3.
 If CloudFront distribution id is supplied, an invalidation will be created once sync process is complete.
 
+A remotely stored dictionary is the main advantage of this package. It is a simple, gzipped file with a description of current state of S3 bucket.
+It drastically increases processing speed and provides an ability to decrease number of S3 requests.
+
 The process may be tuned using flags mentioned above in different ways. See list of options.
 
-**IMPORTANT:** If you change the state of bucket manually, the contents of the dictionary will not be updated. Thus, perform all the bucket update operations through the script or consider manual dictionary removal / `--ignore-map` flag usage, which will let the dictionary to be computed again and stored on the next script invocation.
+**IMPORTANT:** If you change the state of bucket manually, the contents of the dictionary will not be updated.
+Thus, perform all the bucket update operations through the script or consider manual dictionary removal / `--ignore-map` flag usage, which will let the dictionary to be computed again and stored on the next script invocation.
 
 ## Tests
 Clone the repo and run the following command:
@@ -79,12 +86,12 @@ npm i && npm run test
 
 MIT
 
-## TODO:
-* fix versions in package.json
-* improve logging
+## Roadmap:
+* add silent / verbose flags
+* ability to list file names only (with no processing)
+* copy objects instead of uploading again on meta change? tbc
 ### Would be nice to do in future:
 * build redirect objects
-* add verbose / silent flags
 * verify work with paths, etc. on Windows
 * use maps instead of objects
 

@@ -15,14 +15,14 @@ const { CommonError } = require('./lib/errors');
  * @returns {Array}
  */
 module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
-  console.log('► Applying glob pattern, base path is:', basePath);
+  console.log('▹ Applying glob pattern, base path is:', basePath);
   let globResult;
   try {
     globResult = yield globAsync(pattern, { cwd: basePath });
   } catch (e) {
     throw new CommonError('Search files by glob operation failed', e);
   }
-  console.log('|Complete|\n');
+  console.log('✓ Complete\n');
 
   return globResult
     .map(p => path.relative(basePath, path.resolve(basePath, p)))
@@ -35,17 +35,22 @@ module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
  * @param toDelete - Map of files to delete
  */
 module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
-  const removalNeeded = Object.keys(toDelete).length;
-  if (removalNeeded) {
-    console.log('► %s files to be removed. Removing', removalNeeded);
+  const fileNames = Object.keys(toDelete);
+  const filesAmount = fileNames.length;
+  if (filesAmount) {
+    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    console.log('▹ %s files to be removed:', filesAmount);
+    fileNames.forEach(n => console.log(n));
+    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    console.log('▹ Removing...');
     try {
       yield s3HelperInstance.deleteObjects(toDelete);
     } catch (e) {
       throw new CommonError('Files removal failed', e);
     }
-    console.log('|Complete|\n');
+    console.log('✓ Complete\n');
   } else {
-    console.log('► No files to be removed\n');
+    console.log('▹ No files to be removed\n');
   }
 };
 
@@ -55,13 +60,13 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
  * @param localHashesMap
  */
 module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap) {
-  console.log('► Uploading map of file hashes');
+  console.log('▹ Uploading map of file hashes');
   try {
     yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
   } catch (e) {
     throw new CommonError('Files hash map uploading failed', e);
   }
-  console.log('|Complete|\n');
+  console.log('✓ Complete\n');
 };
 
 /**
@@ -73,7 +78,7 @@ module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap)
  * @returns {*}
  */
 module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInvPaths }) {
-  console.log('► Creating CloudFront invalidation for', cfDistId);
+  console.log('▹ Creating CloudFront invalidation for', cfDistId);
   let invalidateResponse;
   try {
     invalidateResponse = yield invalidate(cfClient, cfDistId, cfInvPaths);
@@ -81,7 +86,7 @@ module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInv
     throw new CommonError('CloudFront invalidation creation failed', e);
   }
   const invalidationId = invalidateResponse.Invalidation.Id;
-  console.log('|Complete|-> CloudFront invalidation created: %s\n', invalidationId);
+  console.log('✓ Complete-> CloudFront invalidation created: %s\n', invalidationId);
   return invalidateResponse;
 };
 
@@ -92,42 +97,47 @@ module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInv
  * @param basePath
  */
 module.exports.uploadObjectsToS3 = function* (s3HelperInstance, toUpload, { basePath }) {
-  const uploadNeeded = Object.keys(toUpload).length;
-  if (uploadNeeded) {
-    console.log('► %s files to be uploaded. Uploading', uploadNeeded);
+  const fileNames = Object.keys(toUpload);
+  const filesAmount = fileNames.length;
+  if (filesAmount) {
+    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    console.log('▹ %s files to be uploaded:', filesAmount);
+    fileNames.forEach(n => console.log(n));
+    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    console.log('▹ Uploading...');
     try {
       yield s3HelperInstance.uploadObjects(toUpload, basePath);
     } catch (e) {
       throw new CommonError('Files uploading failed', e);
     }
-    console.log('|Complete|\n');
+    console.log('✓ Complete\n');
   } else {
-    console.log('► No files to be uploaded\n');
+    console.log('▹ No files to be uploaded\n');
   }
 };
 
 /**
  * Calculate the difference between remote and local maps of file hashes
- * @param localHashesMap - A map of file hashes of locally stored files
- * @param remoteHashesMap - A map of file hashes of files stored in S3
- * @returns {{toUpload: {Object}, toDelete: {Object}}} - Object, containing
- * maps of file hashes to be uploaded and deleted correspondingly
+ * @param localHashes - A map of file hashes of locally stored files
+ * @param remoteHashes - A map of file hashes of files stored in S3
+ * @returns {{changed: {Object}, removed: {Object}}} - Object, containing
+ * maps of file hashes
  */
-module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
-  const remoteMapCopy = Object.assign({}, remoteHashesMap);
-  const toUpload = {};
-  for (const key of Object.keys(localHashesMap)) {
+module.exports.detectFileChanges = (localHashes, remoteHashes) => {
+  const remoteMapCopy = Object.assign({}, remoteHashes);
+  const changed = {};
+  for (const key of Object.keys(localHashes)) {
     const remoteFileData = remoteMapCopy[key];
     if (remoteFileData) {
       delete remoteMapCopy[key];
-      if (remoteFileData.eTag !== localHashesMap[key].eTag) {
-        toUpload[key] = localHashesMap[key];
+      if (remoteFileData.eTag !== localHashes[key].eTag) {
+        changed[key] = localHashes[key];
       }
     } else {
-      toUpload[key] = localHashesMap[key];
+      changed[key] = localHashes[key];
     }
   }
-  return { toUpload, toDelete: remoteMapCopy };
+  return { changed, removed: remoteMapCopy };
 };
 
 /**
@@ -136,7 +146,7 @@ module.exports.detectFileChanges = (localHashesMap, remoteHashesMap) => {
  * @returns {{AWS SDK instance}}
  */
 module.exports.configureAwsSdk = params => {
-  console.log('► Configuring AWS SDK\n');
+  console.log('▹ Configuring AWS SDK');
   const awsOptions = {
     sslEnabled: true,
     region: params.region,
@@ -145,43 +155,60 @@ module.exports.configureAwsSdk = params => {
   if (params.profile) {
     aws.config.credentials = new aws.SharedIniFileCredentials({ profile: params.profile });
   }
+  console.log('✓ Complete\n');
   return aws;
 };
 
 /**
  * Compute map of file hashes for locally stored files
  * @param fileNames
- * @param basePath
- * @param concurrency
+ * @param params
  * @returns {Object}
  */
-module.exports.computeLocalHashesMap = function* (fileNames, { basePath, concurrency }) {
-  console.log('► Computing map of hashes for local files');
+module.exports.computeLocalHashesMap = function* (fileNames, params) {
+  console.log('▹ Computing map of hashes for local files');
   let localHashesMap;
   try {
-    localHashesMap = yield computeLocalFilesStats(fileNames, basePath, concurrency);
+    localHashesMap = yield computeLocalFilesStats(fileNames, params.basePath, params.concurrency);
   } catch (e) {
     throw new CommonError('Local files hash map computation failed', e);
   }
-  const localFilesAmount = Object.keys(localHashesMap).length;
-  console.log('|Complete|-> Found', localFilesAmount, 'files locally\n');
-  return localHashesMap;
+  const localFilesAmount = Object.keys(localHashesMap).length - 1;
+  console.log('✓ Complete-> Found', localFilesAmount, 'files locally\n');
+  return { hashes: localHashesMap, params };
 };
 
 /**
  * Compute map of file hashes for S3-stored files
  * @param s3HelperInstance
+ * @param params
  * @returns {*}
  */
-module.exports.computeRemoteHashesMap = function* (s3HelperInstance) {
-  console.log('► Computing map of hashes for S3-stored files');
+module.exports.computeRemoteHashesMap = function* (s3HelperInstance, params) {
+  console.log('▹ Gathering map of hashes for S3-stored files...');
   let remoteHashesMap;
   try {
-    remoteHashesMap = yield s3HelperInstance.getRemoteFilesStats();
+    const useNoMap = params.ignoreMap || params.noMap;
+    if (!useNoMap) {
+      console.log('  ▫ Retrieving map of hashes...');
+      remoteHashesMap = yield s3HelperInstance.getRemoteHashesMap();
+      if (!remoteHashesMap) {
+        console.log('  × No map found');
+      } else {
+        console.log('  ✓ Map found');
+      }
+    }
+    if (!remoteHashesMap) {
+      console.log('  ▫ Computing map of hashes...');
+      remoteHashesMap = {
+        hashes: (yield s3HelperInstance.computeRemoteFilesStats()),
+      };
+      console.log('  ✓ Complete');
+    }
   } catch (e) {
     throw new CommonError('Remote files hash map retrieval / computation failed', e);
   }
-  const remoteFilesAmount = Object.keys(remoteHashesMap).length;
-  console.log('|Complete|-> Found', remoteFilesAmount, 'files in S3\n');
+  const remoteFilesAmount = Object.keys(remoteHashesMap.hashes).length;
+  console.log('✓ Complete-> Found', remoteFilesAmount, 'files in S3\n');
   return remoteHashesMap;
 };

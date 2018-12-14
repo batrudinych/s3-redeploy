@@ -276,9 +276,9 @@ describe('Steps', () => {
           eTag: 'eTag4',
         },
       };
-      const { toUpload, toDelete } = steps.detectFileChanges(localHashesMap, remoteHashesMap);
-      expect(toUpload).toEqual(expectedToUpload);
-      expect(toDelete).toEqual(expectedToDelete);
+      const { changed, removed } = steps.detectFileChanges(localHashesMap, remoteHashesMap);
+      expect(changed).toEqual(expectedToUpload);
+      expect(removed).toEqual(expectedToDelete);
     });
   });
 
@@ -321,13 +321,16 @@ describe('Steps', () => {
       concurrency: 10,
     };
     const fileNames = ['file1', 'file2'];
-    const localHashesMap = {};
+    const localHashesMap = {
+      hashes: {},
+      params,
+    };
     fileNames.forEach(val => {
-      localHashesMap[val] = { eTag: 'eTag' + val };
+      localHashesMap.hashes[val] = { eTag: 'eTag' + val };
     });
 
     test('calls computeLocalFilesStats', done => {
-      hashHelper.computeLocalFilesStats.mockResolvedValue(localHashesMap);
+      hashHelper.computeLocalFilesStats.mockResolvedValue(localHashesMap.hashes);
       co(function* () {
         const result = yield steps.computeLocalHashesMap(fileNames, params);
         expect(hashHelper.computeLocalFilesStats).toBeCalledTimes(1);
@@ -357,19 +360,91 @@ describe('Steps', () => {
   });
 
   describe('computeRemoteHashesMap', () => {
-    test('calls getRemoteFilesStats', done => {
+    test('calls getRemoteHashesMap', done => {
       const remoteHashesMap = {
-        entry1: {
-          eTag: 'value1',
+        hashes: {
+          entry1: {
+            eTag: 'value1',
+          },
         },
       };
       const s3HelperInstance = {
-        getRemoteFilesStats: jest.fn().mockResolvedValue(remoteHashesMap),
+        getRemoteHashesMap: jest.fn().mockResolvedValue(remoteHashesMap),
       };
       co(function* () {
-        const result = yield steps.computeRemoteHashesMap(s3HelperInstance);
-        expect(s3HelperInstance.getRemoteFilesStats).toBeCalledTimes(1);
-        expect(s3HelperInstance.getRemoteFilesStats).toBeCalledWith();
+        const params = {};
+        const result = yield steps.computeRemoteHashesMap(s3HelperInstance, params);
+        expect(s3HelperInstance.getRemoteHashesMap).toBeCalledTimes(1);
+        expect(s3HelperInstance.getRemoteHashesMap).toBeCalledWith();
+        expect(result).toEqual(remoteHashesMap);
+      })
+        .then(() => done())
+        .catch(done);
+    });
+
+    test('calls getRemoteHashesMap and computeRemoteFilesStats if no map found remotely', done => {
+      const remoteHashesMap = {
+        hashes: {
+          entry1: {
+            eTag: 'value1',
+          },
+        },
+      };
+      const s3HelperInstance = {
+        getRemoteHashesMap: jest.fn().mockResolvedValue(),
+        computeRemoteFilesStats: jest.fn().mockResolvedValue(remoteHashesMap.hashes),
+      };
+      co(function* () {
+        const params = {};
+        const result = yield steps.computeRemoteHashesMap(s3HelperInstance, params);
+        expect(s3HelperInstance.getRemoteHashesMap).toBeCalledTimes(1);
+        expect(s3HelperInstance.getRemoteHashesMap).toBeCalledWith();
+        expect(s3HelperInstance.computeRemoteFilesStats).toBeCalledTimes(1);
+        expect(s3HelperInstance.computeRemoteFilesStats).toBeCalledWith();
+        expect(result).toEqual(remoteHashesMap);
+      })
+        .then(() => done())
+        .catch(done);
+    });
+
+    test('--ignore-map: calls computeRemoteFilesStats', done => {
+      const remoteHashesMap = {
+        hashes: {
+          entry1: {
+            eTag: 'value1',
+          },
+        },
+      };
+      const s3HelperInstance = {
+        computeRemoteFilesStats: jest.fn().mockResolvedValue(remoteHashesMap.hashes),
+      };
+      co(function* () {
+        const params = { ignoreMap: true };
+        const result = yield steps.computeRemoteHashesMap(s3HelperInstance, params);
+        expect(s3HelperInstance.computeRemoteFilesStats).toBeCalledTimes(1);
+        expect(s3HelperInstance.computeRemoteFilesStats).toBeCalledWith();
+        expect(result).toEqual(remoteHashesMap);
+      })
+        .then(() => done())
+        .catch(done);
+    });
+
+    test('--no-map: calls computeRemoteFilesStats', done => {
+      const remoteHashesMap = {
+        hashes: {
+          entry1: {
+            eTag: 'value1',
+          },
+        },
+      };
+      const s3HelperInstance = {
+        computeRemoteFilesStats: jest.fn().mockResolvedValue(remoteHashesMap.hashes),
+      };
+      co(function* () {
+        const params = { noMap: true };
+        const result = yield steps.computeRemoteHashesMap(s3HelperInstance, params);
+        expect(s3HelperInstance.computeRemoteFilesStats).toBeCalledTimes(1);
+        expect(s3HelperInstance.computeRemoteFilesStats).toBeCalledWith();
         expect(result).toEqual(remoteHashesMap);
       })
         .then(() => done())
@@ -379,15 +454,15 @@ describe('Steps', () => {
     test('wraps errors', done => {
       const error = new Error('Example error');
       const s3HelperInstance = {
-        getRemoteFilesStats: jest.fn().mockRejectedValue(error),
+        getRemoteHashesMap: jest.fn().mockRejectedValue(error),
       };
       co(function* () {
-        yield steps.computeRemoteHashesMap(s3HelperInstance);
+        yield steps.computeRemoteHashesMap(s3HelperInstance, {});
       })
         .then(() => done(new Error('Should have thrown')))
         .catch(e => {
-          expect(s3HelperInstance.getRemoteFilesStats).toBeCalledTimes(1);
-          expect(s3HelperInstance.getRemoteFilesStats).toBeCalledWith();
+          expect(s3HelperInstance.getRemoteHashesMap).toBeCalledTimes(1);
+          expect(s3HelperInstance.getRemoteHashesMap).toBeCalledWith();
           expect(e instanceof CommonError).toEqual(true);
           expect(e.message).toEqual('Remote files hash map retrieval / computation failed');
           expect(e.originalError).toEqual(error);

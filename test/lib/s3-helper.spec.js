@@ -48,7 +48,6 @@ describe('S3 Helper', () => {
     test('returns a new instance of helper', () => {
       const s3Client = { method: 'stub' };
       const instance = s3Helper.getInstance(s3Client, params);
-      expect(instance._ignoreMap).toEqual(params.ignoreMap || params.noMap);
       expect(instance._cache).toEqual(params.cache);
       expect(instance._gzip).toEqual(params.gzip);
       expect(instance._mapFileName).toEqual(params.fileName);
@@ -215,65 +214,6 @@ describe('S3 Helper', () => {
     });
   });
 
-  describe('computeRemoteFilesStats', () => {
-    test('builds map of hashes based on S3 ETags, skipping hashes map', done => {
-      const instance = s3Helper.getInstance(s3Mock, params);
-      const firstListResponse = {
-        Contents: [{
-          Key: 'firstKeyA',
-          ETag: '"firstETagA"',
-        }, {
-          Key: params.fileName,
-          ETag: '"firstETagB"',
-        }],
-        IsTruncated: true,
-        NextContinuationToken: 'firstToken',
-      };
-      const secondListResponse = {
-        Contents: [{
-          Key: 'secondKey',
-          ETag: '"secondETag"',
-        }],
-        IsTruncated: false,
-        NextContinuationToken: 'secondToken',
-      };
-      const allItems = firstListResponse.Contents.concat(secondListResponse.Contents);
-      const expectedMap = {};
-      for (const item of allItems) {
-        if (item.Key !== params.fileName) {
-          expectedMap[item.Key] = {
-            eTag: item.ETag,
-            contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
-          };
-        }
-      }
-
-      s3Mock.listObjectsV2 = jest.fn()
-        .mockImplementationOnce(args => {
-          expect(args).toEqual({ Bucket: params.bucket });
-          return {
-            promise: () => Promise.resolve(firstListResponse),
-          };
-        })
-        .mockImplementationOnce(args => {
-          expect(args).toEqual({
-            Bucket: params.bucket,
-            ContinuationToken: firstListResponse.NextContinuationToken,
-          });
-          return {
-            promise: () => Promise.resolve(secondListResponse),
-          };
-        });
-      co(function* () {
-        const result = yield instance.computeRemoteFilesStats();
-        expect(s3Mock.listObjectsV2).toBeCalledTimes(2);
-        expect(result).toEqual(expectedMap);
-      })
-        .then(() => done())
-        .catch(done);
-    });
-  });
-
   describe('_uploadObject', () => {
     test('fills basic metadata and uploads object to S3', done => {
       delete params.cache;
@@ -350,47 +290,59 @@ describe('S3 Helper', () => {
     });
   });
 
-  describe('getRemoteFilesStats', () => {
-    test('--ignore-map: computes map of hashes', done => {
-      const instance = s3Helper.getInstance({}, { ignoreMap: true });
-      const stats = { entry1: 'value1' };
-      jest.spyOn(instance, 'computeRemoteFilesStats').mockResolvedValue(stats);
-      jest.spyOn(instance, 'getRemoteHashesMap');
-      co(function* () {
-        const res = yield instance.getRemoteFilesStats();
-        expect(instance.computeRemoteFilesStats).toBeCalledTimes(1);
-        expect(instance.getRemoteHashesMap).toBeCalledTimes(0);
-        expect(res).toEqual(stats);
-      })
-        .then(() => done())
-        .catch(done);
-    });
+  describe('computeRemoteFilesStats', () => {
+    test('builds map of hashes based on S3 ETags, skipping hashes map', done => {
+      const instance = s3Helper.getInstance(s3Mock, params);
+      const firstListResponse = {
+        Contents: [{
+          Key: 'firstKeyA',
+          ETag: '"firstETagA"',
+        }, {
+          Key: params.fileName,
+          ETag: '"firstETagB"',
+        }],
+        IsTruncated: true,
+        NextContinuationToken: 'firstToken',
+      };
+      const secondListResponse = {
+        Contents: [{
+          Key: 'secondKey',
+          ETag: '"secondETag"',
+        }],
+        IsTruncated: false,
+        NextContinuationToken: 'secondToken',
+      };
+      const allItems = firstListResponse.Contents.concat(secondListResponse.Contents);
+      const expectedMap = {};
+      for (const item of allItems) {
+        if (item.Key !== params.fileName) {
+          expectedMap[item.Key] = {
+            eTag: item.ETag,
+            contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
+          };
+        }
+      }
 
-    test('retrieves and returns map of hashes', done => {
-      const instance = s3Helper.getInstance({}, {});
-      const stats = { entry1: 'value1' };
-      jest.spyOn(instance, 'getRemoteHashesMap').mockResolvedValue(stats);
-      jest.spyOn(instance, 'computeRemoteFilesStats');
+      s3Mock.listObjectsV2 = jest.fn()
+        .mockImplementationOnce(args => {
+          expect(args).toEqual({ Bucket: params.bucket });
+          return {
+            promise: () => Promise.resolve(firstListResponse),
+          };
+        })
+        .mockImplementationOnce(args => {
+          expect(args).toEqual({
+            Bucket: params.bucket,
+            ContinuationToken: firstListResponse.NextContinuationToken,
+          });
+          return {
+            promise: () => Promise.resolve(secondListResponse),
+          };
+        });
       co(function* () {
-        const res = yield instance.getRemoteFilesStats();
-        expect(instance.getRemoteHashesMap).toBeCalledTimes(1);
-        expect(instance.computeRemoteFilesStats).toBeCalledTimes(0);
-        expect(res).toEqual(stats);
-      })
-        .then(() => done())
-        .catch(done);
-    });
-
-    test('computes map of hashes if no map found in S3', done => {
-      const instance = s3Helper.getInstance({}, {});
-      const stats = { entry1: 'value1' };
-      jest.spyOn(instance, 'getRemoteHashesMap').mockResolvedValue();
-      jest.spyOn(instance, 'computeRemoteFilesStats').mockResolvedValue(stats);
-      co(function* () {
-        const res = yield instance.getRemoteFilesStats();
-        expect(instance.getRemoteHashesMap).toBeCalledTimes(1);
-        expect(instance.computeRemoteFilesStats).toBeCalledTimes(1);
-        expect(res).toEqual(stats);
+        const result = yield instance.computeRemoteFilesStats();
+        expect(s3Mock.listObjectsV2).toBeCalledTimes(2);
+        expect(result).toEqual(expectedMap);
       })
         .then(() => done())
         .catch(done);

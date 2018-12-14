@@ -10,7 +10,6 @@ const mime = require('mime');
  */
 class S3Helper {
   constructor(s3Client, params) {
-    this._ignoreMap = params.ignoreMap || params.noMap;
     this._cache = params.cache;
     this._gzip = params.gzip;
     this._mapFileName = params.fileName;
@@ -104,16 +103,6 @@ class S3Helper {
       params.ContinuationToken = NextContinuationToken;
     }
     return remoteFilesStats;
-  }
-
-  /**
-   * Get or compute a map of file hashes from S3. A generator-function.
-   * @returns {Object}
-   */
-  * getRemoteFilesStats() {
-    if (this._ignoreMap) return yield this.computeRemoteFilesStats();
-    const remoteStoredMap = yield this.getRemoteHashesMap();
-    return remoteStoredMap || (yield this.computeRemoteFilesStats());
   }
 
   /**

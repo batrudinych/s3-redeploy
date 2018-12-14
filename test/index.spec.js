@@ -24,20 +24,30 @@ jest.mock('../src/lib/s3-helper');
 
 describe('Main', () => {
   let params;
-
+  const s3ClienStub = {
+    method: () => {
+    },
+  };
+  const s3HelperInstance = {
+    method: () => {
+    },
+  };
   beforeEach(() => {
     params = {
       bucket: 'bucket-name',
       pattern: 'folder/**',
       cwd: './home',
     };
+    aws.S3.mockImplementation(function() {
+      return s3ClienStub;
+    });
     processParams.mockReturnValue(params);
     applyGlobPattern.mockResolvedValue([]);
     configureAwsSdk.mockReturnValue(aws);
-    getInstance.mockReturnValue(aws);
+    getInstance.mockReturnValue(s3HelperInstance);
     computeLocalHashesMap.mockResolvedValue({});
     computeRemoteHashesMap.mockResolvedValue({});
-    detectFileChanges.mockReturnValue({ toUpload: {}, toDelete: {} });
+    detectFileChanges.mockReturnValue({ changed: {}, removed: {} });
     uploadObjectsToS3.mockResolvedValue();
     removeExcessFiles.mockResolvedValue();
     storeHashesMapToS3.mockResolvedValue();
@@ -67,23 +77,16 @@ describe('Main', () => {
       .catch(done);
   });
 
-  test('performs computations, updates bucket state and stores file to S3', done => {
+  test('performs computations, updates bucket state and stores map to S3', done => {
     const fileNames = ['/folder/file1'];
-    const localHM = { entry1: 'value1' };
-    const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry3: 'value3' };
-    const toDelete = { entry4: 'value4' };
-    const s3ClienStub = {
-      method: () => {
-      },
-    };
-    aws.S3.mockImplementation(function() {
-      return s3ClienStub;
-    });
+    const localHM = { hashes: { entry1: 'value1' }, params };
+    const remoteHM = { hashes: { entry2: 'value2' }, params };
+    const changed = { entry3: 'value3' };
+    const removed = { entry4: 'value4' };
     applyGlobPattern.mockResolvedValue(fileNames);
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
-    detectFileChanges.mockReturnValue({ toUpload, toDelete });
+    detectFileChanges.mockReturnValue({ changed, removed });
     main()
       .then(() => {
         expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
@@ -92,21 +95,93 @@ describe('Main', () => {
         expect(applyGlobPattern).toBeCalledWith(params);
         expect(configureAwsSdk).toBeCalledTimes(1);
         expect(configureAwsSdk).toBeCalledWith(params);
-        expect(getInstance).toBeCalledTimes(1);
         expect(aws.S3).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledTimes(1);
         expect(getInstance).toBeCalledWith(s3ClienStub, params);
         expect(computeLocalHashesMap).toBeCalledTimes(1);
         expect(computeLocalHashesMap).toBeCalledWith(fileNames, params);
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
-        expect(computeRemoteHashesMap).toBeCalledWith(aws);
+        expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, params);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
+        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
-        expect(uploadObjectsToS3).toBeCalledWith(aws, toUpload, params);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, params);
         expect(removeExcessFiles).toBeCalledTimes(1);
-        expect(removeExcessFiles).toBeCalledWith(aws, toDelete);
+        expect(removeExcessFiles).toBeCalledWith(s3HelperInstance, removed);
         expect(storeHashesMapToS3).toBeCalledTimes(1);
-        expect(storeHashesMapToS3).toBeCalledWith(aws, localHM);
+        expect(storeHashesMapToS3).toBeCalledWith(s3HelperInstance, localHM);
+        expect(invalidateCFDistribution).toBeCalledTimes(0);
+        done();
+      })
+      .catch(done);
+  });
+
+  test('performs computations, uploads all local files and stores map to S3', done => {
+    const fileNames = ['/folder/file1'];
+    const paramsWithChangedMeta = Object.assign({}, params, { gzip: !params.gzip, cache: (params.cache || 0) + 1 });
+    const localHM = { hashes: { entry1: 'value1' }, params };
+    const remoteHM = { hashes: { entry2: 'value2' }, params: paramsWithChangedMeta };
+    const changed = { entry3: 'value3' };
+    const removed = { entry4: 'value4' };
+    applyGlobPattern.mockResolvedValue(fileNames);
+    computeLocalHashesMap.mockResolvedValue(localHM);
+    computeRemoteHashesMap.mockResolvedValue(remoteHM);
+    detectFileChanges.mockReturnValue({ changed, removed });
+    main()
+      .then(() => {
+        expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
+        expect(processParams).toBeCalledTimes(1);
+        expect(applyGlobPattern).toBeCalledTimes(1);
+        expect(applyGlobPattern).toBeCalledWith(params);
+        expect(configureAwsSdk).toBeCalledTimes(1);
+        expect(configureAwsSdk).toBeCalledWith(params);
+        expect(aws.S3).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledWith(s3ClienStub, params);
+        expect(computeLocalHashesMap).toBeCalledTimes(1);
+        expect(computeLocalHashesMap).toBeCalledWith(fileNames, params);
+        expect(computeRemoteHashesMap).toBeCalledTimes(1);
+        expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, params);
+        expect(detectFileChanges).toBeCalledTimes(1);
+        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
+        expect(uploadObjectsToS3).toBeCalledTimes(1);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, localHM.hashes, params);
+        expect(removeExcessFiles).toBeCalledTimes(1);
+        expect(removeExcessFiles).toBeCalledWith(s3HelperInstance, removed);
+        expect(storeHashesMapToS3).toBeCalledTimes(1);
+        expect(storeHashesMapToS3).toBeCalledWith(s3HelperInstance, localHM);
+        expect(invalidateCFDistribution).toBeCalledTimes(0);
+        done();
+      })
+      .catch(done);
+  });
+
+  test('--no-map --no-rm: performs no computations, uploads all local files', done => {
+    const fileNames = ['/folder/file1'];
+    const paramsWithNoMapNoRM = Object.assign({ noRm: true, noMap: true }, params);
+    const localHM = { hashes: { entry1: 'value1' }, params: paramsWithNoMapNoRM };
+    processParams.mockReturnValue(paramsWithNoMapNoRM);
+    applyGlobPattern.mockResolvedValue(fileNames);
+    computeLocalHashesMap.mockResolvedValue(localHM);
+    main()
+      .then(() => {
+        expect(paramsWithNoMapNoRM.basePath).toEqual(path.resolve(process.cwd(), paramsWithNoMapNoRM.cwd));
+        expect(processParams).toBeCalledTimes(1);
+        expect(applyGlobPattern).toBeCalledTimes(1);
+        expect(applyGlobPattern).toBeCalledWith(paramsWithNoMapNoRM);
+        expect(configureAwsSdk).toBeCalledTimes(1);
+        expect(configureAwsSdk).toBeCalledWith(paramsWithNoMapNoRM);
+        expect(aws.S3).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledWith(s3ClienStub, paramsWithNoMapNoRM);
+        expect(computeLocalHashesMap).toBeCalledTimes(1);
+        expect(computeLocalHashesMap).toBeCalledWith(fileNames, paramsWithNoMapNoRM);
+        expect(computeRemoteHashesMap).toBeCalledTimes(0);
+        expect(detectFileChanges).toBeCalledTimes(0);
+        expect(uploadObjectsToS3).toBeCalledTimes(1);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, localHM.hashes, paramsWithNoMapNoRM);
+        expect(removeExcessFiles).toBeCalledTimes(0);
+        expect(storeHashesMapToS3).toBeCalledTimes(0);
         expect(invalidateCFDistribution).toBeCalledTimes(0);
         done();
       })
@@ -115,93 +190,83 @@ describe('Main', () => {
 
   test('--no-rm: removes no files remotely and updates hashes map', done => {
     const fileNames = ['/folder/file1'];
-    const localHM = { entry1: 'value1' };
-    const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry1: 'value1' };
-    const toDelete = { entry2: 'value2' };
-    const resMap = Object.assign({}, toUpload, toDelete);
-    const s3ClienStub = {
-      method: () => {
-      },
-    };
-    aws.S3.mockImplementation(function() {
-      return s3ClienStub;
-    });
+    const paramsWithNoRm = Object.assign({ noRm: true }, params);
+    const localHM = { hashes: { entry1: 'value1' }, params: paramsWithNoRm };
+    const remoteHM = { hashes: { entry2: 'value2' }, params };
+    const changed = { entry1: 'value1' };
+    const removed = { entry2: 'value2' };
+    const resMap = { hashes: Object.assign({}, changed, removed), params: paramsWithNoRm };
     params.noRm = true;
-    processParams.mockReturnValue(params);
+    processParams.mockReturnValue(paramsWithNoRm);
     applyGlobPattern.mockResolvedValue(fileNames);
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
-    detectFileChanges.mockReturnValue({ toUpload, toDelete });
+    detectFileChanges.mockReturnValue({ changed, removed });
     main()
       .then(() => {
-        expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
+        expect(paramsWithNoRm.basePath).toEqual(path.resolve(process.cwd(), paramsWithNoRm.cwd));
         expect(processParams).toBeCalledTimes(1);
         expect(applyGlobPattern).toBeCalledTimes(1);
-        expect(applyGlobPattern).toBeCalledWith(params);
+        expect(applyGlobPattern).toBeCalledWith(paramsWithNoRm);
         expect(configureAwsSdk).toBeCalledTimes(1);
-        expect(configureAwsSdk).toBeCalledWith(params);
-        expect(getInstance).toBeCalledTimes(1);
+        expect(configureAwsSdk).toBeCalledWith(paramsWithNoRm);
         expect(aws.S3).toBeCalledTimes(1);
-        expect(getInstance).toBeCalledWith(s3ClienStub, params);
+        expect(getInstance).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledWith(s3ClienStub, paramsWithNoRm);
         expect(computeLocalHashesMap).toBeCalledTimes(1);
-        expect(computeLocalHashesMap).toBeCalledWith(fileNames, params);
+        expect(computeLocalHashesMap).toBeCalledWith(fileNames, paramsWithNoRm);
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
-        expect(computeRemoteHashesMap).toBeCalledWith(aws);
+        expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, paramsWithNoRm);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
+        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
-        expect(uploadObjectsToS3).toBeCalledWith(aws, toUpload, params);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, paramsWithNoRm);
         expect(removeExcessFiles).toBeCalledTimes(0);
         expect(localHM).toEqual(resMap);
         expect(storeHashesMapToS3).toBeCalledTimes(1);
-        expect(storeHashesMapToS3).toBeCalledWith(aws, localHM);
+        expect(storeHashesMapToS3).toBeCalledWith(s3HelperInstance, localHM);
         expect(invalidateCFDistribution).toBeCalledTimes(0);
         done();
       })
       .catch(done);
   });
 
-  test('--no-rm --no-map: removes no files remotely and stores no map', done => {
+  test('--no-map: stores no map', done => {
     const fileNames = ['/folder/file1'];
-    const localHM = { entry1: 'value1' };
-    const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry1: 'value1' };
-    const toDelete = { entry2: 'value2' };
-    const s3ClienStub = {
-      method: () => {
-      },
-    };
-    aws.S3.mockImplementation(function() {
-      return s3ClienStub;
-    });
+    const paramsWithNoMap = Object.assign({ noMap: true }, params);
+    const localHM = { hashes: { entry1: 'value1' }, params: paramsWithNoMap };
+    const remoteHM = { hashes: { entry2: 'value2' }, params };
+    const changed = { entry1: 'value1' };
+    const removed = { entry2: 'value2' };
+    const resMap = { hashes: changed, params: paramsWithNoMap };
     params.noRm = true;
-    params.noMap = true;
-    processParams.mockReturnValue(params);
+    processParams.mockReturnValue(paramsWithNoMap);
     applyGlobPattern.mockResolvedValue(fileNames);
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
-    detectFileChanges.mockReturnValue({ toUpload, toDelete });
+    detectFileChanges.mockReturnValue({ changed, removed });
     main()
       .then(() => {
-        expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
+        expect(paramsWithNoMap.basePath).toEqual(path.resolve(process.cwd(), paramsWithNoMap.cwd));
         expect(processParams).toBeCalledTimes(1);
         expect(applyGlobPattern).toBeCalledTimes(1);
-        expect(applyGlobPattern).toBeCalledWith(params);
+        expect(applyGlobPattern).toBeCalledWith(paramsWithNoMap);
         expect(configureAwsSdk).toBeCalledTimes(1);
-        expect(configureAwsSdk).toBeCalledWith(params);
-        expect(getInstance).toBeCalledTimes(1);
+        expect(configureAwsSdk).toBeCalledWith(paramsWithNoMap);
         expect(aws.S3).toBeCalledTimes(1);
-        expect(getInstance).toBeCalledWith(s3ClienStub, params);
+        expect(getInstance).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledWith(s3ClienStub, paramsWithNoMap);
         expect(computeLocalHashesMap).toBeCalledTimes(1);
-        expect(computeLocalHashesMap).toBeCalledWith(fileNames, params);
+        expect(computeLocalHashesMap).toBeCalledWith(fileNames, paramsWithNoMap);
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
-        expect(computeRemoteHashesMap).toBeCalledWith(aws);
+        expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, paramsWithNoMap);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
+        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
-        expect(uploadObjectsToS3).toBeCalledWith(aws, toUpload, params);
-        expect(removeExcessFiles).toBeCalledTimes(0);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, paramsWithNoMap);
+        expect(removeExcessFiles).toBeCalledTimes(1);
+        expect(removeExcessFiles).toBeCalledWith(s3HelperInstance, removed);
+        expect(localHM).toEqual(resMap);
         expect(storeHashesMapToS3).toBeCalledTimes(0);
         expect(invalidateCFDistribution).toBeCalledTimes(0);
         done();
@@ -211,21 +276,14 @@ describe('Main', () => {
 
   test('--cf-dist-id: creates an invalidation', done => {
     const fileNames = ['/folder/file1'];
-    const localHM = { entry1: 'value1' };
-    const remoteHM = { entry2: 'value2' };
-    const toUpload = { entry3: 'value3' };
-    const toDelete = { entry4: 'value4' };
-    const s3ClienStub = {
-      method: () => {
-      },
-    };
+    const localHM = { hashes: { entry1: 'value1' }, params };
+    const remoteHM = { hashes: { entry2: 'value2' }, params };
+    const changed = { entry3: 'value3' };
+    const removed = { entry4: 'value4' };
     const cfClienStub = {
       method: () => {
       },
     };
-    aws.S3.mockImplementation(function() {
-      return s3ClienStub;
-    });
     aws.CloudFront.mockImplementation(function() {
       return cfClienStub;
     });
@@ -234,7 +292,7 @@ describe('Main', () => {
     applyGlobPattern.mockResolvedValue(fileNames);
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
-    detectFileChanges.mockReturnValue({ toUpload, toDelete });
+    detectFileChanges.mockReturnValue({ changed, removed });
     main()
       .then(() => {
         expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
@@ -243,21 +301,21 @@ describe('Main', () => {
         expect(applyGlobPattern).toBeCalledWith(params);
         expect(configureAwsSdk).toBeCalledTimes(1);
         expect(configureAwsSdk).toBeCalledWith(params);
-        expect(getInstance).toBeCalledTimes(1);
         expect(aws.S3).toBeCalledTimes(1);
+        expect(getInstance).toBeCalledTimes(1);
         expect(getInstance).toBeCalledWith(s3ClienStub, params);
         expect(computeLocalHashesMap).toBeCalledTimes(1);
         expect(computeLocalHashesMap).toBeCalledWith(fileNames, params);
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
-        expect(computeRemoteHashesMap).toBeCalledWith(aws);
+        expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, params);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
+        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
-        expect(uploadObjectsToS3).toBeCalledWith(aws, toUpload, params);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, params);
         expect(removeExcessFiles).toBeCalledTimes(1);
-        expect(removeExcessFiles).toBeCalledWith(aws, toDelete);
+        expect(removeExcessFiles).toBeCalledWith(s3HelperInstance, removed);
         expect(storeHashesMapToS3).toBeCalledTimes(1);
-        expect(storeHashesMapToS3).toBeCalledWith(aws, localHM);
+        expect(storeHashesMapToS3).toBeCalledWith(s3HelperInstance, localHM);
         expect(invalidateCFDistribution).toBeCalledTimes(1);
         expect(invalidateCFDistribution).toBeCalledWith(cfClienStub, params);
         done();
