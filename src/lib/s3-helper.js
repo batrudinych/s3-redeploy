@@ -1,6 +1,6 @@
 'use strict';
 
-const { parallel, gzipStream, gzipAsync, gunzipAsync, shouldGzip } = require('./utils');
+const { parallel, gzipStream, gzipAsync, gunzipAsync } = require('./utils');
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime');
@@ -10,12 +10,25 @@ const mime = require('mime');
  */
 class S3Helper {
   constructor(s3Client, params) {
-    this._cache = params.cache;
+    this._noMap = params.noMap;
     this._gzip = params.gzip;
     this._mapFileName = params.fileName;
     this._concurrency = params.concurrency;
     this._s3Client = s3Client;
-    this._s3BaseParams = { Bucket: params.bucket };
+
+    const cacheControl = [];
+
+    if (params.cache) {
+      cacheControl.push('max-age=' + params.cache);
+    }
+
+    if (params.immutable) {
+      cacheControl.push('immutable');
+    }
+
+    if (cacheControl.length) {
+      this._cacheControl = cacheControl.join(', ');
+    }
   }
 
   /**
@@ -34,7 +47,7 @@ class S3Helper {
     return parallel(
       batches,
       batch =>
-        this._s3Client.deleteObjects(Object.assign({ Delete: { Objects: batch } }, this._s3BaseParams)).promise(),
+        this._s3Client.deleteObjects({ Delete: { Objects: batch } }).promise(),
       this._concurrency
     );
   }
@@ -57,7 +70,7 @@ class S3Helper {
    * @returns {Promise<Object>} - Map of file hashes
    */
   getRemoteHashesMap() {
-    return this._s3Client.getObject(Object.assign({ Key: this._mapFileName }, this._s3BaseParams))
+    return this._s3Client.getObject({ Key: this._mapFileName })
       .promise()
       .then(data => data.ContentEncoding === 'gzip' ? gunzipAsync(data.Body) : data.Body)
       .then(buff => JSON.parse(buff.toString('utf8')))
@@ -73,7 +86,7 @@ class S3Helper {
    * @returns {Promise<>}
    */
   storeRemoteHashesMap(map) {
-    const mapUploadParams = Object.assign({ ContentEncoding: 'gzip' }, this._s3BaseParams);
+    const mapUploadParams = { ContentEncoding: 'gzip' };
     return gzipAsync(JSON.stringify(map))
       .then(buff => this._s3Client.putObject(Object.assign({
         Key: this._mapFileName,
@@ -87,13 +100,13 @@ class S3Helper {
    * @returns {Object}
    */
   * computeRemoteFilesStats() {
-    const params = Object.assign({}, this._s3BaseParams);
+    const params = {};
     let hasNext = true;
     const remoteFilesStats = {};
     while (hasNext) {
       const { Contents, IsTruncated, NextContinuationToken } = yield this._s3Client.listObjectsV2(params).promise();
       for (const item of Contents) {
-        if (item.Key === this._mapFileName) continue;
+        if (!this._noMap && item.Key === this._mapFileName) continue;
         remoteFilesStats[item.Key] = {
           eTag: item.ETag,
           contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
@@ -114,15 +127,15 @@ class S3Helper {
    * @private
    */
   _uploadObject(fileName, fileData, basePath) {
-    const shouldBeZipped = shouldGzip(fileName, this._gzip);
+    const shouldBeZipped = fileData.gzip;
     const contentType = mime.getType(fileName);
     const fStream = fs.createReadStream(path.join(basePath, fileName));
-    const putParams = Object.assign({
+    const putParams = {
       ACL: 'public-read',
       Key: fileName,
       Body: shouldBeZipped ? gzipStream(fStream) : fStream,
       ContentMD5: fileData.contentMD5,
-    }, this._s3BaseParams);
+    };
 
     if (contentType) {
       putParams.ContentType = contentType;
@@ -132,11 +145,11 @@ class S3Helper {
       putParams.ContentEncoding = 'gzip';
     }
 
-    if (this._cache) {
-      putParams.CacheControl = 'max-age=' + this._cache;
+    if (this._cacheControl) {
+      putParams.CacheControl = this._cacheControl;
     }
 
-    return this._s3Client.putObject(putParams).promise();
+    return this._s3Client.upload(putParams).promise();
   }
 }
 

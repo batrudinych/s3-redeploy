@@ -208,7 +208,7 @@ describe('Utils', () => {
   });
 
   describe('dashToCamel', () => {
-    test('returns empty string if input value is falsey', () => {
+    test('returns empty string if input value is falsy', () => {
       expect(utils.dashToCamel('')).toEqual('');
     });
 
@@ -238,6 +238,51 @@ describe('Utils', () => {
 
     test('returns true if value represents a positive integer', () => {
       expect(utils.isPositiveInteger('1')).toEqual(true);
+    });
+  });
+
+  describe('isMetaChanged', () => {
+    test('returns true if falsy prevParams are supplied', () => {
+      expect(utils.isMetaChanged({})).toEqual(true);
+    });
+
+    test('returns true if cache value has changed', () => {
+      const cache = 1;
+      expect(utils.isMetaChanged({ cache }, { cache: cache + 1 })).toEqual(true);
+    });
+
+    test('returns true if immutable value has changed', () => {
+      const immutable = true;
+      expect(utils.isMetaChanged({ immutable }, { immutable: !immutable })).toEqual(true);
+    });
+
+    test('returns true if type of gzip value has changed', () => {
+      const gzip = true;
+      expect(utils.isMetaChanged({ gzip }, { gzip: undefined })).toEqual(true);
+    });
+
+    test('returns true if non-array gzip value has changed', () => {
+      const gzip = true;
+      expect(utils.isMetaChanged({ gzip }, { gzip: false })).toEqual(true);
+    });
+
+    test('returns true if array gzip value length has changed', () => {
+      const gzip = ['html'];
+      expect(utils.isMetaChanged({ gzip }, { gzip: ['txt'].concat(gzip) })).toEqual(true);
+    });
+
+    test('returns true if array gzip value internals have changed', () => {
+      const gzip = ['html'];
+      expect(utils.isMetaChanged({ gzip }, { gzip: ['txt'] })).toEqual(true);
+    });
+
+    test('returns false if nothing has changed', () => {
+      const params = {
+        gzip: ['html'],
+        immutable: false,
+        cache: 1000,
+      };
+      expect(utils.isMetaChanged(params, params)).toEqual(false);
     });
   });
 });

@@ -164,7 +164,12 @@ describe('Arguments processor', () => {
       inputParams.gzip = 'txt; HTML;;';
       const resultParams = argsProcessor.processParams(inputParams);
       expect(resultParams.gzip).toEqual(
-        inputParams.gzip.replace(/ /g, '').split(';').filter(Boolean).map(s => s.toLowerCase()));
+        inputParams.gzip
+          .replace(/ /g, '')
+          .split(';')
+          .filter(Boolean)
+          .map(s => s.toLowerCase())
+          .sort());
     });
   });
 });

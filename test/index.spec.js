@@ -1,9 +1,11 @@
 'use strict';
 
 const path = require('path');
-const main = require('../src');
 const aws = require('aws-sdk');
+
+const main = require('../src');
 const { getInstance } = require('../src/lib/s3-helper');
+const { isMetaChanged } = require('../src/lib/utils');
 const {
   uploadObjectsToS3,
   storeHashesMapToS3,
@@ -16,11 +18,25 @@ const {
   configureAwsSdk,
 } = require('../src/steps');
 const { processParams } = require('../src/lib/args-processor');
+const logger = require('../src/lib/logger');
 
 jest.mock('aws-sdk');
 jest.mock('../src/lib/args-processor');
 jest.mock('../src/steps');
 jest.mock('../src/lib/s3-helper');
+jest.mock('../src/lib/utils');
+jest.mock('../src/lib/logger', () => ({
+  init: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    verbose: jest.fn(),
+    error: jest.fn(),
+  }),
+  get: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    verbose: jest.fn(),
+    error: jest.fn(),
+  }),
+}));
 
 describe('Main', () => {
   let params;
@@ -52,6 +68,26 @@ describe('Main', () => {
     removeExcessFiles.mockResolvedValue();
     storeHashesMapToS3.mockResolvedValue();
     invalidateCFDistribution.mockResolvedValue();
+  });
+
+  test('uses passed logger', done => {
+    main({}, logger.init())
+      .then(() => {
+        expect(logger.init).toBeCalledTimes(1);
+        done();
+      })
+      .catch(done);
+  });
+
+  test('initializes verbose logger', done => {
+    params.verbose = true;
+    main()
+      .then(() => {
+        expect(logger.init).toBeCalledTimes(1);
+        expect(logger.init).toBeCalledWith({ level: 'verbose' });
+        done();
+      })
+      .catch(done);
   });
 
   test('returns null if no files found by glob', done => {
@@ -87,6 +123,7 @@ describe('Main', () => {
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
     detectFileChanges.mockReturnValue({ changed, removed });
+    isMetaChanged.mockReturnValue(false);
     main()
       .then(() => {
         expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
@@ -127,6 +164,7 @@ describe('Main', () => {
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
     detectFileChanges.mockReturnValue({ changed, removed });
+    isMetaChanged.mockReturnValue(true);
     main()
       .then(() => {
         expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));
@@ -142,6 +180,8 @@ describe('Main', () => {
         expect(computeLocalHashesMap).toBeCalledWith(fileNames, params);
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
         expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, params);
+        expect(isMetaChanged).toBeCalledTimes(1);
+        expect(isMetaChanged).toBeCalledWith(params, paramsWithChangedMeta);
         expect(detectFileChanges).toBeCalledTimes(1);
         expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
@@ -163,6 +203,7 @@ describe('Main', () => {
     processParams.mockReturnValue(paramsWithNoMapNoRM);
     applyGlobPattern.mockResolvedValue(fileNames);
     computeLocalHashesMap.mockResolvedValue(localHM);
+    isMetaChanged.mockReturnValue(false);
     main()
       .then(() => {
         expect(paramsWithNoMapNoRM.basePath).toEqual(path.resolve(process.cwd(), paramsWithNoMapNoRM.cwd));
@@ -202,6 +243,7 @@ describe('Main', () => {
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
     detectFileChanges.mockReturnValue({ changed, removed });
+    isMetaChanged.mockReturnValue(false);
     main()
       .then(() => {
         expect(paramsWithNoRm.basePath).toEqual(path.resolve(process.cwd(), paramsWithNoRm.cwd));
@@ -245,6 +287,7 @@ describe('Main', () => {
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
     detectFileChanges.mockReturnValue({ changed, removed });
+    isMetaChanged.mockReturnValue(false);
     main()
       .then(() => {
         expect(paramsWithNoMap.basePath).toEqual(path.resolve(process.cwd(), paramsWithNoMap.cwd));
@@ -293,6 +336,7 @@ describe('Main', () => {
     computeLocalHashesMap.mockResolvedValue(localHM);
     computeRemoteHashesMap.mockResolvedValue(remoteHM);
     detectFileChanges.mockReturnValue({ changed, removed });
+    isMetaChanged.mockReturnValue(false);
     main()
       .then(() => {
         expect(params.basePath).toEqual(path.resolve(process.cwd(), params.cwd));

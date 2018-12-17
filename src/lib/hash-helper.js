@@ -3,32 +3,38 @@
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
-const { parallel, fsStatAsync } = require('./utils');
+const { parallel, fsStatAsync, gzipStream, shouldGzip } = require('./utils');
 
 /**
  * Calculate file hash using stream API
  * @param path - Path to the file
+ * @param gzip - Flag, indicating if file contents should be gzipped
  * @returns {Promise<Array>} - Promise, which resolves with a Uint array, containing file hash
  */
-module.exports._computeFileHash = path => new Promise((resolve, reject) => {
+module.exports._computeFileHash = (path, gzip) => new Promise((resolve, reject) => {
   const hash = crypto.createHash('md5');
   const fileStream = fs.createReadStream(path);
   let errorHappened = false;
-  fileStream
-    .on('error', reject)
+  let streamsChain = fileStream.on('error', reject);
+  if (gzip) {
+    streamsChain = gzipStream(fileStream).on('error', errorHandler);
+  }
+  streamsChain
     .pipe(hash)
-    .on('error', e => {
-      errorHappened = true;
-      fileStream.close();
-      hash.end();
-      reject(e);
-    })
+    .on('error', errorHandler)
     .on('finish', () => {
       if (!errorHappened) {
         hash.end();
         resolve(hash.read());
       }
     });
+
+  function errorHandler(e) {
+    errorHappened = true;
+    fileStream.close();
+    hash.end();
+    reject(e);
+  }
 });
 
 /**
@@ -36,11 +42,12 @@ module.exports._computeFileHash = path => new Promise((resolve, reject) => {
  * @param fileNames - File names array, relative to cwd
  * @param basePath - Absolute path to the folder, containing files to be processed
  * @param concurrency - Parallel execution limit
+ * @param gzip - Flag / list of extensions to gzip
  * @returns {Object} - Map of file hashes in form of: relative [file name]: {hash data}
  */
-module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurrency) {
+module.exports.computeLocalFilesStats = function* (fileNames, { basePath, concurrency, gzip }) {
   const localFilesStats = {};
-  const fileNameProcessor = module.exports._getFileNameProcessor(basePath, localFilesStats);
+  const fileNameProcessor = module.exports._getFileNameProcessor(basePath, localFilesStats, gzip);
   yield parallel(
     fileNames,
     fileNameProcessor,
@@ -49,16 +56,22 @@ module.exports.computeLocalFilesStats = function* (fileNames, basePath, concurre
   return localFilesStats;
 };
 
-module.exports._getFileNameProcessor = (basePath, localFilesStats) => fileName => {
+module.exports._getFileNameProcessor = (basePath, localFilesStats, gzip) => fileName => {
   const filePath = path.join(basePath, fileName);
   return fsStatAsync(filePath)
-    .then(fstats => fstats.isFile() ? module.exports._computeFileHash(filePath) : null)
+    .then(fstats => {
+      if (fstats.isFile()) {
+        const gzipFlag = shouldGzip(filePath, gzip);
+        localFilesStats[fileName] = { gzip: gzipFlag };
+        return module.exports._computeFileHash(filePath, gzipFlag);
+      }
+
+      return null;
+    })
     .then(hash => {
       if (hash) {
-        localFilesStats[fileName] = {
-          eTag: `"${hash.toString('hex')}"`,
-          contentMD5: hash.toString('base64'),
-        };
+        localFilesStats[fileName].eTag = `"${hash.toString('hex')}"`;
+        localFilesStats[fileName].contentMD5 = hash.toString('base64');
       }
     });
 };

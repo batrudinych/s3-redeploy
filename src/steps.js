@@ -6,6 +6,7 @@ const { invalidate } = require('./lib/cf-helper');
 const { globAsync } = require('./lib/utils');
 const { computeLocalFilesStats } = require('./lib/hash-helper');
 const { CommonError } = require('./lib/errors');
+const logger = require('./lib/logger').get();
 
 /**
  * Search for file system objects by glob pattern and return all the file names
@@ -15,14 +16,14 @@ const { CommonError } = require('./lib/errors');
  * @returns {Array}
  */
 module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
-  console.log('▹ Applying glob pattern, base path is:', basePath);
+  logger.info('▹ Applying glob pattern, base path is:', basePath);
   let globResult;
   try {
     globResult = yield globAsync(pattern, { cwd: basePath });
   } catch (e) {
     throw new CommonError('Search files by glob operation failed', e);
   }
-  console.log('✓ Complete\n');
+  logger.info('✓ Complete\n');
 
   return globResult
     .map(p => path.relative(basePath, path.resolve(basePath, p)))
@@ -38,19 +39,19 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
   const fileNames = Object.keys(toDelete);
   const filesAmount = fileNames.length;
   if (filesAmount) {
-    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
-    console.log('▹ %s files to be removed:', filesAmount);
-    fileNames.forEach(n => console.log(n));
-    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
-    console.log('▹ Removing...');
+    logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
+    logger.info('▹ %s files to be removed', filesAmount);
+    fileNames.forEach(n => logger.verbose(n));
+    logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    logger.info('▹ Removing');
     try {
       yield s3HelperInstance.deleteObjects(toDelete);
     } catch (e) {
       throw new CommonError('Files removal failed', e);
     }
-    console.log('✓ Complete\n');
+    logger.info('✓ Complete\n');
   } else {
-    console.log('▹ No files to be removed\n');
+    logger.info('▹ No files to be removed\n');
   }
 };
 
@@ -60,13 +61,13 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
  * @param localHashesMap
  */
 module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap) {
-  console.log('▹ Uploading map of file hashes');
+  logger.info('▹ Uploading map of file hashes');
   try {
     yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
   } catch (e) {
     throw new CommonError('Files hash map uploading failed', e);
   }
-  console.log('✓ Complete\n');
+  logger.info('✓ Complete\n');
 };
 
 /**
@@ -78,7 +79,7 @@ module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap)
  * @returns {*}
  */
 module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInvPaths }) {
-  console.log('▹ Creating CloudFront invalidation for', cfDistId);
+  logger.info('▹ Creating CloudFront invalidation for', cfDistId);
   let invalidateResponse;
   try {
     invalidateResponse = yield invalidate(cfClient, cfDistId, cfInvPaths);
@@ -86,7 +87,7 @@ module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInv
     throw new CommonError('CloudFront invalidation creation failed', e);
   }
   const invalidationId = invalidateResponse.Invalidation.Id;
-  console.log('✓ Complete-> CloudFront invalidation created: %s\n', invalidationId);
+  logger.info('✓ Complete-> CloudFront invalidation created: %s\n', invalidationId);
   return invalidateResponse;
 };
 
@@ -100,19 +101,19 @@ module.exports.uploadObjectsToS3 = function* (s3HelperInstance, toUpload, { base
   const fileNames = Object.keys(toUpload);
   const filesAmount = fileNames.length;
   if (filesAmount) {
-    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
-    console.log('▹ %s files to be uploaded:', filesAmount);
-    fileNames.forEach(n => console.log(n));
-    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
-    console.log('▹ Uploading...');
+    logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
+    logger.info('▹ %s files to be uploaded', filesAmount);
+    fileNames.forEach(n => logger.verbose(n));
+    logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    logger.info('▹ Uploading');
     try {
       yield s3HelperInstance.uploadObjects(toUpload, basePath);
     } catch (e) {
       throw new CommonError('Files uploading failed', e);
     }
-    console.log('✓ Complete\n');
+    logger.info('✓ Complete\n');
   } else {
-    console.log('▹ No files to be uploaded\n');
+    logger.info('▹ No files to be uploaded\n');
   }
 };
 
@@ -146,16 +147,17 @@ module.exports.detectFileChanges = (localHashes, remoteHashes) => {
  * @returns {{AWS SDK instance}}
  */
 module.exports.configureAwsSdk = params => {
-  console.log('▹ Configuring AWS SDK');
+  logger.info('▹ Configuring AWS SDK');
   const awsOptions = {
     sslEnabled: true,
     region: params.region,
   };
   aws.config.update(awsOptions);
+  aws.config.s3 = { params: { Bucket: params.bucket } };
   if (params.profile) {
     aws.config.credentials = new aws.SharedIniFileCredentials({ profile: params.profile });
   }
-  console.log('✓ Complete\n');
+  logger.info('✓ Complete\n');
   return aws;
 };
 
@@ -166,15 +168,15 @@ module.exports.configureAwsSdk = params => {
  * @returns {Object}
  */
 module.exports.computeLocalHashesMap = function* (fileNames, params) {
-  console.log('▹ Computing map of hashes for local files');
+  logger.info('▹ Computing map of hashes for local files');
   let localHashesMap;
   try {
-    localHashesMap = yield computeLocalFilesStats(fileNames, params.basePath, params.concurrency);
+    localHashesMap = yield computeLocalFilesStats(fileNames, params);
   } catch (e) {
     throw new CommonError('Local files hash map computation failed', e);
   }
-  const localFilesAmount = Object.keys(localHashesMap).length - 1;
-  console.log('✓ Complete-> Found', localFilesAmount, 'files locally\n');
+  const localFilesAmount = Object.keys(localHashesMap).length;
+  logger.info('✓ Complete-> Found', localFilesAmount, 'files locally\n');
   return { hashes: localHashesMap, params };
 };
 
@@ -185,30 +187,30 @@ module.exports.computeLocalHashesMap = function* (fileNames, params) {
  * @returns {*}
  */
 module.exports.computeRemoteHashesMap = function* (s3HelperInstance, params) {
-  console.log('▹ Gathering map of hashes for S3-stored files...');
+  logger.info('▹ Gathering map of hashes for S3-stored files');
   let remoteHashesMap;
   try {
     const useNoMap = params.ignoreMap || params.noMap;
     if (!useNoMap) {
-      console.log('  ▫ Retrieving map of hashes...');
+      logger.info('  ▫ Retrieving map of hashes');
       remoteHashesMap = yield s3HelperInstance.getRemoteHashesMap();
       if (!remoteHashesMap) {
-        console.log('  × No map found');
+        logger.info('  × No map found');
       } else {
-        console.log('  ✓ Map found');
+        logger.info('  ✓ Map found');
       }
     }
     if (!remoteHashesMap) {
-      console.log('  ▫ Computing map of hashes...');
+      logger.info('  ▫ Computing map of hashes');
       remoteHashesMap = {
         hashes: (yield s3HelperInstance.computeRemoteFilesStats()),
       };
-      console.log('  ✓ Complete');
+      logger.info('  ✓ Complete');
     }
   } catch (e) {
     throw new CommonError('Remote files hash map retrieval / computation failed', e);
   }
   const remoteFilesAmount = Object.keys(remoteHashesMap.hashes).length;
-  console.log('✓ Complete-> Found', remoteFilesAmount, 'files in S3\n');
+  logger.info('✓ Complete-> Found', remoteFilesAmount, 'files in S3\n');
   return remoteHashesMap;
 };

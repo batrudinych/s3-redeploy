@@ -112,3 +112,37 @@ module.exports.dashToCamel = str => {
  */
 module.exports.isPositiveInteger =
   val => !isNaN(val) && String(parseInt(val, 10)) === String(val) && parseInt(val, 10) > 0;
+
+/**
+ * Verify if meta info configuration has changed between script invocations
+ * @param curParams
+ * @param prevParams
+ * @returns {boolean}
+ */
+module.exports.isMetaChanged = (curParams, prevParams) => {
+  if (!prevParams) {
+    return true;
+  }
+
+  if (curParams.cache !== prevParams.cache ||
+    curParams.immutable !== prevParams.immutable ||
+    typeof curParams.gzip !== typeof prevParams.gzip) {
+    return true;
+  }
+
+  if (!Array.isArray(curParams.gzip)) {
+    return curParams.gzip !== prevParams.gzip;
+  }
+
+  if (curParams.gzip.length !== prevParams.gzip.length) {
+    return true;
+  }
+
+  for (const ext of curParams.gzip) {
+    if (!prevParams.gzip.includes(ext)) {
+      return true;
+    }
+  }
+
+  return false;
+};

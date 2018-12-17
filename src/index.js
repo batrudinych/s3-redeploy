@@ -5,27 +5,29 @@ const path = require('path');
 
 const s3Helper = require('./lib/s3-helper');
 const { processParams } = require('./lib/args-processor');
+const { isMetaChanged } = require('./lib/utils');
 const steps = require('./steps');
 
-module.exports = co.wrap(function* (params) {
+module.exports = co.wrap(function* (params, logger) {
   const paramsObj = processParams(params);
-  console.log('∾∾∾∾∾∾∾∾∾∾ s3-redeploy ∾∾∾∾∾∾∾∾∾∾');
-  console.log('Execution starts with the following params:');
-  console.log(JSON.stringify(paramsObj, null, 2));
-  console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+  logger = logger || require('./lib/logger').init({ level: paramsObj.verbose ? 'verbose' : 'info' });
+  logger.verbose('∾∾∾∾∾∾∾∾∾∾ s3-redeploy ∾∾∾∾∾∾∾∾∾∾');
+  logger.verbose('Execution starts with the following params:');
+  logger.verbose(JSON.stringify(paramsObj, null, 2));
+  logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
 
   paramsObj.basePath = path.resolve(process.cwd(), paramsObj.cwd);
 
   const fileNames = yield steps.applyGlobPattern(paramsObj);
 
   if (!fileNames.length) {
-    console.log('Found no files to process. Exit\n');
+    logger.info('Found no files to process. Exit\n');
     return null;
   } else {
-    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
-    console.log('▹ %s items found in file system:', fileNames.length);
-    fileNames.forEach(n => console.log(n));
-    console.log('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
+    logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
+    logger.info('▹ %s items found in file system', fileNames.length);
+    fileNames.forEach(n => logger.verbose(n));
+    logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
   }
 
   const aws = steps.configureAwsSdk(paramsObj);
@@ -40,20 +42,17 @@ module.exports = co.wrap(function* (params) {
   } else {
     const remoteHashesMap = yield steps.computeRemoteHashesMap(s3HelperInstance, paramsObj);
 
-    const prevParams = remoteHashesMap.params;
-    const metadataChanged = !prevParams || prevParams.cache !== paramsObj.cache || prevParams.gzip !== paramsObj.gzip;
-
-    console.log('▹ Computing difference\n');
+    logger.info('▹ Computing difference\n');
     const { changed, removed } = steps.detectFileChanges(localHashesMap.hashes, remoteHashesMap.hashes);
 
-    const toUpload = metadataChanged ? localHashesMap.hashes : changed;
+    const toUpload = isMetaChanged(paramsObj, remoteHashesMap.params) ? localHashesMap.hashes : changed;
 
     yield steps.uploadObjectsToS3(s3HelperInstance, toUpload, paramsObj);
 
     if (!paramsObj.noRm) {
       yield steps.removeExcessFiles(s3HelperInstance, removed);
     } else {
-      console.log('▹ Skipping removal as correspondent flag is set');
+      logger.info('▹ Skip removal as correspondent flag is set\n');
       Object.assign(localHashesMap.hashes, removed);
     }
 

@@ -59,7 +59,12 @@ module.exports.processParams = params => {
   }
 
   if (result.gzip && typeof result.gzip === 'string') {
-    result.gzip = result.gzip.replace(/ /g, '').split(';').filter(Boolean).map(s => s.toLowerCase());
+    result.gzip = result.gzip
+      .replace(/ /g, '')
+      .split(';')
+      .filter(Boolean)
+      .map(s => s.toLowerCase())
+      .sort();
   }
 
   return result;

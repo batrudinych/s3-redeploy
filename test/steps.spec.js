@@ -13,6 +13,18 @@ jest.mock('aws-sdk');
 jest.mock('../src/lib/hash-helper');
 jest.mock('../src/lib/utils');
 jest.mock('../src/lib/cf-helper');
+jest.mock('../src/lib/logger', () => ({
+  init: () => ({
+    info: console.log,
+    verbose: console.log,
+    error: console.log,
+  }),
+  get: () => ({
+    info: console.log,
+    verbose: console.log,
+    error: console.log,
+  }),
+}));
 
 describe('Steps', () => {
   describe('applyGlobPattern', () => {
@@ -296,6 +308,15 @@ describe('Steps', () => {
       expect(configuredAws.config.update).toBeCalledWith(expectedOptions);
     });
 
+    test('sets S3 bucket param for aws sdk module', () => {
+      const params = {
+        bucket: 'bucket-name',
+      };
+      const configuredAws = steps.configureAwsSdk(params);
+      expect(configuredAws).toEqual(aws);
+      expect(configuredAws.config.s3).toEqual({ params: { Bucket: params.bucket }});
+    });
+
     test('sets region and profile for aws sdk module', () => {
       const params = { region: 'awsRegion', profile: 'profile' };
       const expectedOptions = Object.assign({ sslEnabled: true }, params);
@@ -334,7 +355,7 @@ describe('Steps', () => {
       co(function* () {
         const result = yield steps.computeLocalHashesMap(fileNames, params);
         expect(hashHelper.computeLocalFilesStats).toBeCalledTimes(1);
-        expect(hashHelper.computeLocalFilesStats).toBeCalledWith(fileNames, params.basePath, params.concurrency);
+        expect(hashHelper.computeLocalFilesStats).toBeCalledWith(fileNames, params);
         expect(result).toEqual(localHashesMap);
       })
         .then(() => done())
@@ -350,7 +371,7 @@ describe('Steps', () => {
         .then(() => done(new Error('Should have thrown')))
         .catch(e => {
           expect(hashHelper.computeLocalFilesStats).toBeCalledTimes(1);
-          expect(hashHelper.computeLocalFilesStats).toBeCalledWith(fileNames, params.basePath, params.concurrency);
+          expect(hashHelper.computeLocalFilesStats).toBeCalledWith(fileNames, params);
           expect(e instanceof CommonError).toEqual(true);
           expect(e.message).toEqual('Local files hash map computation failed');
           expect(e.originalError).toEqual(error);

@@ -26,6 +26,9 @@ describe('S3 Helper', () => {
     putObject: jest.fn().mockReturnValue({
       promise: () => Promise.resolve(),
     }),
+    upload: jest.fn().mockReturnValue({
+      promise: () => Promise.resolve(),
+    }),
     deleteObjects: jest.fn().mockReturnValue({
       promise: () => Promise.resolve(),
     }),
@@ -38,6 +41,7 @@ describe('S3 Helper', () => {
       ignoreMap: true,
       noMap: true,
       cache: 3600,
+      immutable: true,
       gzip: true,
       fileName: 'file name',
       concurrency: 10,
@@ -47,13 +51,15 @@ describe('S3 Helper', () => {
   describe('getInstance', () => {
     test('returns a new instance of helper', () => {
       const s3Client = { method: 'stub' };
+      const cacheControl = ['max-age=' + params.cache, 'immutable'].join(', ');
       const instance = s3Helper.getInstance(s3Client, params);
-      expect(instance._cache).toEqual(params.cache);
+      expect(instance._cacheControl).toEqual(cacheControl);
       expect(instance._gzip).toEqual(params.gzip);
       expect(instance._mapFileName).toEqual(params.fileName);
       expect(instance._concurrency).toEqual(params.concurrency);
+      expect(instance._noMap).toEqual(params.noMap);
       expect(instance._s3Client).toEqual(s3Client);
-      expect(instance._s3BaseParams).toEqual({ Bucket: params.bucket });
+      expect(instance._cacheControl).toEqual(`max-age=${params.cache}, immutable`);
     });
   });
 
@@ -83,7 +89,6 @@ describe('S3 Helper', () => {
         .then(() => {
           expect(s3Mock.deleteObjects).toBeCalledTimes(1);
           expect(s3Mock.deleteObjects).toBeCalledWith({
-            Bucket: params.bucket,
             Delete: {
               Objects: batches[0],
             },
@@ -126,6 +131,8 @@ describe('S3 Helper', () => {
       const instance = s3Helper.getInstance(s3Mock, params);
       instance.getRemoteHashesMap()
         .then(res => {
+          expect(s3Mock.getObject).toBeCalledTimes(1);
+          expect(s3Mock.getObject).toBeCalledWith({ Key: params.fileName });
           expect(utils.gunzipAsync).toBeCalledTimes(0);
           expect(res).toEqual(remoteMap);
           done();
@@ -145,6 +152,8 @@ describe('S3 Helper', () => {
       const instance = s3Helper.getInstance(s3Mock, params);
       instance.getRemoteHashesMap()
         .then(res => {
+          expect(s3Mock.getObject).toBeCalledTimes(1);
+          expect(s3Mock.getObject).toBeCalledWith({ Key: params.fileName });
           expect(utils.gunzipAsync).toBeCalledTimes(1);
           expect(utils.gunzipAsync).toBeCalledWith(body);
           expect(res).toEqual(remoteMap);
@@ -205,7 +214,6 @@ describe('S3 Helper', () => {
           expect(s3Mock.putObject).toBeCalledWith({
             Key: params.fileName,
             Body: buff,
-            Bucket: params.bucket,
             ContentEncoding: 'gzip',
           });
           done();
@@ -217,34 +225,31 @@ describe('S3 Helper', () => {
   describe('_uploadObject', () => {
     test('fills basic metadata and uploads object to S3', done => {
       delete params.cache;
+      delete params.immutable;
       const fileName = '/folder1/file1.txt';
       const fileData = {
         contentMD5: 'md5',
+        gzip: false,
       };
       const streamMock = new stream.Readable();
       const basePath = __dirname;
       jest.spyOn(mime, 'getType').mockReturnValue();
       jest.spyOn(fs, 'createReadStream').mockReturnValue(streamMock);
-      utils.shouldGzip.mockReturnValue();
       const instance = s3Helper.getInstance(s3Mock, params);
       instance._uploadObject(fileName, fileData, basePath)
         .then(() => {
-          expect(s3Mock.putObject).toBeCalledTimes(1);
-          expect(s3Mock.putObject).toBeCalledWith({
-            Bucket: params.bucket,
+          expect(s3Mock.upload).toBeCalledTimes(1);
+          expect(s3Mock.upload).toBeCalledWith({
             ACL: 'public-read',
             Key: fileName,
             Body: streamMock,
             ContentMD5: fileData.contentMD5,
           });
-          expect(utils.shouldGzip).toBeCalledTimes(1);
-          expect(utils.shouldGzip).toBeCalledWith(fileName, params.gzip);
           expect(mime.getType).toBeCalledTimes(1);
           expect(mime.getType).toBeCalledWith(fileName);
           expect(fs.createReadStream).toBeCalledTimes(1);
           expect(fs.createReadStream).toBeCalledWith(path.join(basePath, fileName));
           expect(utils.gzipStream).toBeCalledTimes(0);
-          // fs.createReadStream.mockRestore();
           done();
         })
         .catch(done);
@@ -254,30 +259,28 @@ describe('S3 Helper', () => {
       const fileName = '/folder1/file1.txt';
       const fileData = {
         contentMD5: 'md5',
+        gzip: true,
       };
+      const cacheControl = ['max-age=' + params.cache, 'immutable'].join(', ');
       const streamMock = new stream.Readable();
       const basePath = __dirname;
       const mimeType = 'mimeType';
       jest.spyOn(mime, 'getType').mockReturnValue(mimeType);
       jest.spyOn(fs, 'createReadStream').mockReturnValue(streamMock);
-      utils.shouldGzip.mockReturnValue(true);
       utils.gzipStream.mockReturnValue(streamMock);
       const instance = s3Helper.getInstance(s3Mock, params);
       instance._uploadObject(fileName, fileData, basePath)
         .then(() => {
-          expect(s3Mock.putObject).toBeCalledTimes(1);
-          expect(s3Mock.putObject).toBeCalledWith({
-            Bucket: params.bucket,
+          expect(s3Mock.upload).toBeCalledTimes(1);
+          expect(s3Mock.upload).toBeCalledWith({
             ACL: 'public-read',
             Key: fileName,
             Body: streamMock,
             ContentEncoding: 'gzip',
             ContentMD5: fileData.contentMD5,
             ContentType: mimeType,
-            CacheControl: 'max-age=' + params.cache,
+            CacheControl: cacheControl,
           });
-          expect(utils.shouldGzip).toBeCalledTimes(1);
-          expect(utils.shouldGzip).toBeCalledWith(fileName, params.gzip);
           expect(mime.getType).toBeCalledTimes(1);
           expect(mime.getType).toBeCalledWith(fileName);
           expect(fs.createReadStream).toBeCalledTimes(1);
@@ -291,7 +294,7 @@ describe('S3 Helper', () => {
   });
 
   describe('computeRemoteFilesStats', () => {
-    test('builds map of hashes based on S3 ETags, skipping hashes map', done => {
+    test('builds map of hashes based on S3 ETags including hashes map if --no-map is set', done => {
       const instance = s3Helper.getInstance(s3Mock, params);
       const firstListResponse = {
         Contents: [{
@@ -315,7 +318,7 @@ describe('S3 Helper', () => {
       const allItems = firstListResponse.Contents.concat(secondListResponse.Contents);
       const expectedMap = {};
       for (const item of allItems) {
-        if (item.Key !== params.fileName) {
+        if (item.Key !== params.fileName || params.noMap) {
           expectedMap[item.Key] = {
             eTag: item.ETag,
             contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
@@ -325,14 +328,70 @@ describe('S3 Helper', () => {
 
       s3Mock.listObjectsV2 = jest.fn()
         .mockImplementationOnce(args => {
-          expect(args).toEqual({ Bucket: params.bucket });
+          expect(args).toEqual({});
           return {
             promise: () => Promise.resolve(firstListResponse),
           };
         })
         .mockImplementationOnce(args => {
           expect(args).toEqual({
-            Bucket: params.bucket,
+            ContinuationToken: firstListResponse.NextContinuationToken,
+          });
+          return {
+            promise: () => Promise.resolve(secondListResponse),
+          };
+        });
+      co(function* () {
+        const result = yield instance.computeRemoteFilesStats();
+        expect(s3Mock.listObjectsV2).toBeCalledTimes(2);
+        expect(result).toEqual(expectedMap);
+      })
+        .then(() => done())
+        .catch(done);
+    });
+
+    test('builds map of hashes based on S3 ETags skipping hashes map', done => {
+      delete params.noMap;
+      const instance = s3Helper.getInstance(s3Mock, params);
+      const firstListResponse = {
+        Contents: [{
+          Key: 'firstKeyA',
+          ETag: '"firstETagA"',
+        }, {
+          Key: params.fileName,
+          ETag: '"firstETagB"',
+        }],
+        IsTruncated: true,
+        NextContinuationToken: 'firstToken',
+      };
+      const secondListResponse = {
+        Contents: [{
+          Key: 'secondKey',
+          ETag: '"secondETag"',
+        }],
+        IsTruncated: false,
+        NextContinuationToken: 'secondToken',
+      };
+      const allItems = firstListResponse.Contents.concat(secondListResponse.Contents);
+      const expectedMap = {};
+      for (const item of allItems) {
+        if (item.Key !== params.fileName || params.noMap) {
+          expectedMap[item.Key] = {
+            eTag: item.ETag,
+            contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
+          };
+        }
+      }
+
+      s3Mock.listObjectsV2 = jest.fn()
+        .mockImplementationOnce(args => {
+          expect(args).toEqual({});
+          return {
+            promise: () => Promise.resolve(firstListResponse),
+          };
+        })
+        .mockImplementationOnce(args => {
+          expect(args).toEqual({
             ContinuationToken: firstListResponse.NextContinuationToken,
           });
           return {
