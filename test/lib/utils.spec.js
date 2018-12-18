@@ -193,7 +193,7 @@ describe('Utils', () => {
 
   describe('shouldGzip', () => {
     test('returns nothing if gzip is false', () => {
-      expect(utils.shouldGzip(__filename, false)).toEqual(undefined);
+      expect(utils.shouldGzip(__filename, false)).toEqual(false);
     });
 
     test('returns true if gzip is truthy', () => {
@@ -203,7 +203,7 @@ describe('Utils', () => {
     test('verifies file extension against given list', () => {
       expect(utils.shouldGzip(__filename, ['js', 'txt'])).toEqual(true);
       expect(utils.shouldGzip(__filename, ['html', 'txt'])).toEqual(false);
-      expect(utils.shouldGzip('/home/noextension', ['js', 'html', 'txt'])).toEqual(undefined);
+      expect(utils.shouldGzip('/home/noextension', ['js', 'html', 'txt'])).toEqual(false);
     });
   });
 

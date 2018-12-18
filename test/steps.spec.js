@@ -41,7 +41,7 @@ describe('Steps', () => {
         const result = yield steps.applyGlobPattern({ basePath, pattern });
         expect(utils.globAsync).toBeCalledTimes(1);
         expect(utils.globAsync).toBeCalledWith(pattern, { cwd: basePath });
-        expect(result).toEqual(globRes.slice(1).map(p => path.relative(basePath, p)));
+        expect(result).toEqual(globRes.slice(1).map(p => path.relative(basePath, p).replace(/\\/g, '/')));
       })
         .then(() => done())
         .catch(done);
@@ -314,7 +314,7 @@ describe('Steps', () => {
       };
       const configuredAws = steps.configureAwsSdk(params);
       expect(configuredAws).toEqual(aws);
-      expect(configuredAws.config.s3).toEqual({ params: { Bucket: params.bucket }});
+      expect(configuredAws.config.s3).toEqual({ params: { Bucket: params.bucket } });
     });
 
     test('sets region and profile for aws sdk module', () => {

@@ -26,7 +26,7 @@ module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
   logger.info('✓ Complete\n');
 
   return globResult
-    .map(p => path.relative(basePath, path.resolve(basePath, p)))
+    .map(p => path.relative(basePath, path.resolve(basePath, p)).replace(/\\/g, '/'))
     .filter(Boolean);
 };
 
@@ -40,7 +40,7 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
   const filesAmount = fileNames.length;
   if (filesAmount) {
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
-    logger.info('▹ %s files to be removed', filesAmount);
+    logger.info('▹ %s file(s) to be removed', filesAmount);
     fileNames.forEach(n => logger.verbose(n));
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
     logger.info('▹ Removing');
@@ -102,7 +102,7 @@ module.exports.uploadObjectsToS3 = function* (s3HelperInstance, toUpload, { base
   const filesAmount = fileNames.length;
   if (filesAmount) {
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
-    logger.info('▹ %s files to be uploaded', filesAmount);
+    logger.info('▹ %s file(s) to be uploaded', filesAmount);
     fileNames.forEach(n => logger.verbose(n));
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
     logger.info('▹ Uploading');

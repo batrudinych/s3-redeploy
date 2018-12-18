@@ -25,7 +25,7 @@ module.exports = co.wrap(function* (params, logger) {
     return null;
   } else {
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
-    logger.info('▹ %s items found in file system', fileNames.length);
+    logger.info('▹ %s item(s) found in file system', fileNames.length);
     fileNames.forEach(n => logger.verbose(n));
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
   }

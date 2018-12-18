@@ -87,6 +87,7 @@ module.exports.shouldGzip = (fileName, gzip) => {
       return true;
     }
   }
+  return false;
 };
 
 /**
