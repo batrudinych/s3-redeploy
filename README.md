@@ -8,8 +8,6 @@
 
 Node.js utility to sync files to Amazon S3 and invalidate CloudFront distributions.
 
-# Module status: WIP until 1.0.0 release
-
 ## Usage
 
 npm >= 5.2.0
@@ -91,7 +89,6 @@ MIT
 
 ## Would be nice to do in future:
 * build redirect objects
-* verify work with paths, etc. on Windows
 * use maps instead of objects
 * ability to list file names only (with no processing)
 
