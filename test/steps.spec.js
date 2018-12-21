@@ -68,7 +68,9 @@ describe('Steps', () => {
   describe('removeExcessFiles', () => {
     test('calls deleteObjects', done => {
       const toDelete = {
-        entry1: 'value1',
+        hashes: {
+          entry1: 'value1',
+        },
       };
       const s3HelperInstance = {
         deleteObjects: jest.fn().mockResolvedValue(),
@@ -76,14 +78,16 @@ describe('Steps', () => {
       co(function* () {
         yield steps.removeExcessFiles(s3HelperInstance, toDelete);
         expect(s3HelperInstance.deleteObjects).toBeCalledTimes(1);
-        expect(s3HelperInstance.deleteObjects).toBeCalledWith(toDelete);
+        expect(s3HelperInstance.deleteObjects).toBeCalledWith(Object.keys(toDelete.hashes));
       })
         .then(() => done())
         .catch(done);
     });
 
     test('does nothing if there is nothing to remove', done => {
-      const toDelete = {};
+      const toDelete = {
+        hashes: {},
+      };
       const s3HelperInstance = {
         deleteObjects: jest.fn().mockResolvedValue(),
       };
@@ -98,7 +102,9 @@ describe('Steps', () => {
     test('wraps deleteObjects errors', done => {
       const error = new Error('Example error');
       const toDelete = {
-        entry1: 'value1',
+        hashes: {
+          entry1: 'value1',
+        },
       };
       const s3HelperInstance = {
         deleteObjects: jest.fn().mockRejectedValue(error),
@@ -109,7 +115,7 @@ describe('Steps', () => {
         .then(() => done(new Error('Should have thrown')))
         .catch(e => {
           expect(s3HelperInstance.deleteObjects).toBeCalledTimes(1);
-          expect(s3HelperInstance.deleteObjects).toBeCalledWith(toDelete);
+          expect(s3HelperInstance.deleteObjects).toBeCalledWith(Object.keys(toDelete.hashes));
           expect(e instanceof CommonError).toEqual(true);
           expect(e.message).toEqual('Files removal failed');
           expect(e.originalError).toEqual(error);
@@ -120,9 +126,13 @@ describe('Steps', () => {
 
   describe('storeHashesMapToS3', () => {
     const localHashesMap = {
-      entry1: {
-        eTag: 'value1',
+      hashes: {
+        entry1: 'value1',
       },
+      gzip: {
+        entry1: true,
+      },
+      params: {},
     };
     test('calls storeRemoteHashesMap', done => {
       const s3HelperInstance = {
@@ -131,7 +141,10 @@ describe('Steps', () => {
       co(function* () {
         yield steps.storeHashesMapToS3(s3HelperInstance, localHashesMap);
         expect(s3HelperInstance.storeRemoteHashesMap).toBeCalledTimes(1);
-        expect(s3HelperInstance.storeRemoteHashesMap).toBeCalledWith(localHashesMap);
+        expect(s3HelperInstance.storeRemoteHashesMap).toBeCalledWith({
+          hashes: localHashesMap.hashes,
+          params: localHashesMap.params,
+        });
       })
         .then(() => done())
         .catch(done);
@@ -148,7 +161,10 @@ describe('Steps', () => {
         .then(() => done(new Error('Should have thrown')))
         .catch(e => {
           expect(s3HelperInstance.storeRemoteHashesMap).toBeCalledTimes(1);
-          expect(s3HelperInstance.storeRemoteHashesMap).toBeCalledWith(localHashesMap);
+          expect(s3HelperInstance.storeRemoteHashesMap).toBeCalledWith({
+            hashes: localHashesMap.hashes,
+            params: localHashesMap.params,
+          });
           expect(e instanceof CommonError).toEqual(true);
           expect(e.message).toEqual('Files hash map uploading failed');
           expect(e.originalError).toEqual(error);
@@ -200,23 +216,27 @@ describe('Steps', () => {
   describe('uploadObjectsToS3', () => {
     const basePath = __dirname;
     test('calls uploadObjects', done => {
-      const toUpdate = {
-        entry1: 'value1',
+      const toUpload = {
+        hashes: {
+          entry1: 'value1',
+        },
       };
       const s3HelperInstance = {
         uploadObjects: jest.fn().mockResolvedValue(),
       };
       co(function* () {
-        yield steps.uploadObjectsToS3(s3HelperInstance, toUpdate, { basePath });
+        yield steps.uploadObjectsToS3(s3HelperInstance, toUpload, { basePath });
         expect(s3HelperInstance.uploadObjects).toBeCalledTimes(1);
-        expect(s3HelperInstance.uploadObjects).toBeCalledWith(toUpdate, basePath);
+        expect(s3HelperInstance.uploadObjects).toBeCalledWith(toUpload, basePath);
       })
         .then(() => done())
         .catch(done);
     });
 
     test('does nothing if there is nothing to remove', done => {
-      const toUpdate = {};
+      const toUpdate = {
+        hashes: {},
+      };
       const s3HelperInstance = {
         uploadObjects: jest.fn().mockResolvedValue(),
       };
@@ -231,7 +251,9 @@ describe('Steps', () => {
     test('wraps uploadObjects errors', done => {
       const error = new Error('Example error');
       const toUpdate = {
-        entry1: 'value1',
+        hashes: {
+          entry1: 'value1',
+        },
       };
       const s3HelperInstance = {
         uploadObjects: jest.fn().mockRejectedValue(error),
@@ -252,45 +274,48 @@ describe('Steps', () => {
   });
 
   describe('detectFileChanges', () => {
-    test('computes difference based on eTags', () => {
+    test('computes difference based on hashes', () => {
       const localHashesMap = {
-        'file1': {
-          eTag: 'eTag1',
+        hashes: {
+          file1: 'hash1',
+          file2: 'hash2',
+          file3: 'hash3',
+          file5: 'hash5',
+          file6: 'hash6',
         },
-        'file2': {
-          eTag: 'eTag2',
-        },
-        'file3': {
-          eTag: 'eTag3',
+        gzip: {
+          file1: true,
+          file3: true,
         },
       };
       const remoteHashesMap = {
-        'file1': {
-          eTag: 'eTag1-obsolete',
-        },
-        'file2': {
-          eTag: 'eTag2',
-        },
-        'file4': {
-          eTag: 'eTag4',
+        hashes: {
+          file1: 'hash1-old',
+          file2: 'hash2',
+          file4: 'hash4',
+          file5: 'hash5-old',
         },
       };
-      const expectedToUpload = {
-        'file1': {
-          eTag: 'eTag1',
+      const expectedChanged = {
+        hashes: {
+          file1: 'hash1',
+          file3: 'hash3',
+          file5: 'hash5',
+          file6: 'hash6',
         },
-        'file3': {
-          eTag: 'eTag3',
+        gzip: {
+          file1: true,
+          file3: true,
         },
       };
-      const expectedToDelete = {
-        'file4': {
-          eTag: 'eTag4',
+      const expectedRemoved = {
+        hashes: {
+          file4: 'hash4',
         },
       };
       const { changed, removed } = steps.detectFileChanges(localHashesMap, remoteHashesMap);
-      expect(changed).toEqual(expectedToUpload);
-      expect(removed).toEqual(expectedToDelete);
+      expect(changed).toEqual(expectedChanged);
+      expect(removed).toEqual(expectedRemoved);
     });
   });
 
@@ -343,20 +368,19 @@ describe('Steps', () => {
     };
     const fileNames = ['file1', 'file2'];
     const localHashesMap = {
-      hashes: {},
-      params,
+      hashes: fileNames.reduce((acc, val) => {
+        acc[val] = 'hash' + val;
+        return acc;
+      }, {}),
     };
-    fileNames.forEach(val => {
-      localHashesMap.hashes[val] = { eTag: 'eTag' + val };
-    });
 
     test('calls computeLocalFilesStats', done => {
-      hashHelper.computeLocalFilesStats.mockResolvedValue(localHashesMap.hashes);
+      hashHelper.computeLocalFilesStats.mockResolvedValue(localHashesMap);
       co(function* () {
         const result = yield steps.computeLocalHashesMap(fileNames, params);
         expect(hashHelper.computeLocalFilesStats).toBeCalledTimes(1);
         expect(hashHelper.computeLocalFilesStats).toBeCalledWith(fileNames, params);
-        expect(result).toEqual(localHashesMap);
+        expect(result).toEqual(Object.assign({ params }, localHashesMap));
       })
         .then(() => done())
         .catch(done);

@@ -46,7 +46,10 @@ module.exports._computeFileHash = (path, gzip) => new Promise((resolve, reject) 
  * @returns {Object} - Map of file hashes in form of: relative [file name]: {hash data}
  */
 module.exports.computeLocalFilesStats = function* (fileNames, { basePath, concurrency, gzip }) {
-  const localFilesStats = {};
+  const localFilesStats = {
+    hashes: {},
+    gzip: {},
+  };
   const fileNameProcessor = module.exports._getFileNameProcessor(basePath, localFilesStats, gzip);
   yield parallel(
     fileNames,
@@ -62,7 +65,9 @@ module.exports._getFileNameProcessor = (basePath, localFilesStats, gzip) => file
     .then(fstats => {
       if (fstats.isFile()) {
         const gzipFlag = shouldGzip(filePath, gzip);
-        localFilesStats[fileName] = { gzip: gzipFlag };
+        if (gzipFlag) {
+          localFilesStats.gzip[fileName] = gzipFlag;
+        }
         return module.exports._computeFileHash(filePath, gzipFlag);
       }
 
@@ -70,8 +75,7 @@ module.exports._getFileNameProcessor = (basePath, localFilesStats, gzip) => file
     })
     .then(hash => {
       if (hash) {
-        localFilesStats[fileName].eTag = `"${hash.toString('hex')}"`;
-        localFilesStats[fileName].contentMD5 = hash.toString('base64');
+        localFilesStats.hashes[fileName] = hash.toString('hex');
       }
     });
 };

@@ -33,10 +33,10 @@ class S3Helper {
 
   /**
    * Remove objects (in batches) from S3 according to the passed map. Keys are used as file paths in S3
-   * @param toDelete - Map of file hashes
+   * @param keys - List of file names
    */
-  deleteObjects(toDelete) {
-    const allObjects = Object.keys(toDelete).map(Key => ({ Key }));
+  deleteObjects(keys) {
+    const allObjects = keys.map(Key => ({ Key }));
     const batchSize = 1000;
     const batchesCount = Math.ceil(allObjects.length / batchSize);
     const batches = [];
@@ -59,8 +59,8 @@ class S3Helper {
    */
   uploadObjects(toUpload, basePath) {
     return parallel(
-      Object.keys(toUpload),
-      fileName => this._uploadObject(fileName, toUpload[fileName], basePath),
+      Object.keys(toUpload.hashes),
+      fileName => this._uploadObject(fileName, toUpload, basePath),
       this._concurrency
     );
   }
@@ -107,10 +107,7 @@ class S3Helper {
       const { Contents, IsTruncated, NextContinuationToken } = yield this._s3Client.listObjectsV2(params).promise();
       for (const item of Contents) {
         if (!this._noMap && item.Key === this._mapFileName) continue;
-        remoteFilesStats[item.Key] = {
-          eTag: item.ETag,
-          contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
-        };
+        remoteFilesStats[item.Key] = item.ETag.slice(1, -1);
       }
       hasNext = IsTruncated;
       params.ContinuationToken = NextContinuationToken;
@@ -121,35 +118,35 @@ class S3Helper {
   /**
    * Upload a local file onto S3. Uses stream API
    * @param fileName - File name, relative to cwd
-   * @param fileData - Object, containing hash data
+   * @param toUpload - Map of files hash data
    * @param basePath - Base path, absolute, based on cwd
    * @returns {Promise<>}
    * @private
    */
-  _uploadObject(fileName, fileData, basePath) {
-    const shouldBeZipped = fileData.gzip;
+  _uploadObject(fileName, toUpload, basePath) {
+    const shouldBeZipped = toUpload.gzip[fileName];
     const contentType = mime.getType(fileName);
     const fStream = fs.createReadStream(path.join(basePath, fileName));
-    const putParams = {
+    const uploadParams = {
       ACL: 'public-read',
       Key: fileName,
       Body: shouldBeZipped ? gzipStream(fStream) : fStream,
-      ContentMD5: fileData.contentMD5,
+      ContentMD5: Buffer.from(toUpload.hashes[fileName], 'hex').toString('base64'),
     };
 
     if (contentType) {
-      putParams.ContentType = contentType;
+      uploadParams.ContentType = contentType;
     }
 
     if (shouldBeZipped) {
-      putParams.ContentEncoding = 'gzip';
+      uploadParams.ContentEncoding = 'gzip';
     }
 
     if (this._cacheControl) {
-      putParams.CacheControl = this._cacheControl;
+      uploadParams.CacheControl = this._cacheControl;
     }
 
-    return this._s3Client.upload(putParams).promise();
+    return this._s3Client.upload(uploadParams).promise();
   }
 }
 

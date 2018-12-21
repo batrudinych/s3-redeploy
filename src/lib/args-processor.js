@@ -2,6 +2,25 @@
 
 const { dashToCamel, isPositiveInteger } = require('./utils');
 const { CommonError } = require('./errors');
+const supportedParameters = [
+  'bucket',
+  'cwd',
+  'pattern',
+  'gzip',
+  'profile',
+  'region',
+  'cfDistId',
+  'cfInvPaths',
+  'ignoreMap',
+  'noMap',
+  'noRm',
+  'concurrency',
+  'fileName',
+  'cache',
+  'immutable',
+  'verbose',
+];
+
 /**
  * Transform array with arguments into a map of values
  * @returns {Object}
@@ -28,6 +47,13 @@ module.exports.parse = args => {
  * @returns {Object}
  */
 module.exports.processParams = params => {
+  const keys = Object.keys(params);
+  for (const key of keys) {
+    if (!supportedParameters.includes(key)) {
+      throw new CommonError('Unknown parameter: ' + key);
+    }
+  }
+
   if (!params.bucket) {
     throw new CommonError('Bucket name should be set');
   }

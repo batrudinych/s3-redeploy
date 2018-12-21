@@ -108,11 +108,11 @@ describe('Hash helper', () => {
   });
 
   describe('getFileNameProcessor', () => {
-    const fileNames = ['/folder1/file1.html', '/folder1.txt', ''];
+    const fileNames = ['/folder1/file1.html', '/folder1/file2.txt', '/folder1', ''];
     const basePath = '/home/website';
 
     test('returns a processor function', () => {
-      const processorFunction = hashHelper._getFileNameProcessor(fileNames, basePath);
+      const processorFunction = hashHelper._getFileNameProcessor(basePath, {});
       expect(typeof processorFunction).toEqual('function');
     });
 
@@ -122,7 +122,7 @@ describe('Hash helper', () => {
       test('gathers stats for given file', done => {
         const fileName = fileNames[0];
         jest.spyOn(hashHelper, '_computeFileHash').mockResolvedValue();
-        const processorFunction = hashHelper._getFileNameProcessor(basePath, {});
+        const processorFunction = hashHelper._getFileNameProcessor(basePath, { hashes: {}, gzip: {} });
         processorFunction(fileName)
           .then(() => {
             expect(utils.fsStatAsync).toBeCalledTimes(1);
@@ -140,7 +140,7 @@ describe('Hash helper', () => {
         const gzip = false;
         utils.shouldGzip.mockReturnValue(gzip);
         jest.spyOn(hashHelper, '_computeFileHash').mockResolvedValue(fileName);
-        const processorFunction = hashHelper._getFileNameProcessor(basePath, {}, gzip);
+        const processorFunction = hashHelper._getFileNameProcessor(basePath, { hashes: {}, gzip: {} }, gzip);
         processorFunction(fileName)
           .then(() => {
             expect(hashHelper._computeFileHash).toBeCalledTimes(1);
@@ -155,9 +155,9 @@ describe('Hash helper', () => {
       });
 
       test('omits folders', done => {
-        const fileName = fileNames[1];
+        const fileName = fileNames[2];
         jest.spyOn(hashHelper, '_computeFileHash').mockResolvedValue();
-        const processorFunction = hashHelper._getFileNameProcessor(basePath, {});
+        const processorFunction = hashHelper._getFileNameProcessor(basePath, { hashes: {}, gzip: {} });
         processorFunction(fileName)
           .then(() => {
             expect(hashHelper._computeFileHash).toBeCalledTimes(0);
@@ -171,20 +171,21 @@ describe('Hash helper', () => {
       });
 
       test('fills map with values', done => {
-        const resultMap = {};
-        const fileName = fileNames[0];
-        const gzip = ['html'];
-        jest.spyOn(hashHelper, '_computeFileHash').mockResolvedValueOnce(Buffer.from(fileName));
+        const resultMap = { hashes: {}, gzip: {} };
+        const getExt = str => str.substring(str.indexOf('.') + 1);
+        const getFileName = str => str.substring(str.lastIndexOf('/') + 1);
+        const ext = getExt(fileNames[0]);
+        const gzip = [ext];
+        jest.spyOn(hashHelper, '_computeFileHash').mockImplementation(path => Buffer.from(getFileName(path)));
         const processorFunction = hashHelper._getFileNameProcessor(basePath, resultMap, gzip);
-        utils.shouldGzip.mockImplementation(path => gzip.includes(path.substring(path.indexOf('.') + 1)));
+        utils.shouldGzip.mockImplementation(path => gzip.includes(getExt(path)));
         Promise.all(fileNames.map(processorFunction))
           .then(() => {
-            expect(Object.keys(resultMap).length).toEqual(1);
-            expect(resultMap[fileName]).toEqual({
-              eTag: `"${Buffer.from(fileName).toString('hex')}"`,
-              contentMD5: `${Buffer.from(fileName).toString('base64')}`,
-              gzip: fileName.includes(gzip[0]),
-            });
+            expect(Object.keys(resultMap.hashes).length).toEqual(2);
+            expect(Object.keys(resultMap.gzip).length).toEqual(1);
+            expect(resultMap.hashes[fileNames[0]]).toEqual(Buffer.from(getFileName(fileNames[0])).toString('hex'));
+            expect(resultMap.hashes[fileNames[1]]).toEqual(Buffer.from(getFileName(fileNames[1])).toString('hex'));
+            expect(resultMap.gzip[fileNames[0]]).toEqual(gzip.includes(ext));
             hashHelper._computeFileHash.mockRestore();
             done();
           })

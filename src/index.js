@@ -38,14 +38,14 @@ module.exports = co.wrap(function* (params, logger) {
   const shouldUpdateOnly = paramsObj.noRm && paramsObj.noMap;
 
   if (shouldUpdateOnly) {
-    yield steps.uploadObjectsToS3(s3HelperInstance, localHashesMap.hashes, paramsObj);
+    yield steps.uploadObjectsToS3(s3HelperInstance, localHashesMap, paramsObj);
   } else {
     const remoteHashesMap = yield steps.computeRemoteHashesMap(s3HelperInstance, paramsObj);
 
     logger.info('▹ Computing difference\n');
-    const { changed, removed } = steps.detectFileChanges(localHashesMap.hashes, remoteHashesMap.hashes);
+    const { changed, removed } = steps.detectFileChanges(localHashesMap, remoteHashesMap);
 
-    const toUpload = isMetaChanged(paramsObj, remoteHashesMap.params) ? localHashesMap.hashes : changed;
+    const toUpload = isMetaChanged(paramsObj, remoteHashesMap.params) ? localHashesMap : changed;
 
     yield steps.uploadObjectsToS3(s3HelperInstance, toUpload, paramsObj);
 
@@ -53,7 +53,7 @@ module.exports = co.wrap(function* (params, logger) {
       yield steps.removeExcessFiles(s3HelperInstance, removed);
     } else {
       logger.info('▹ Skip removal as correspondent flag is set\n');
-      Object.assign(localHashesMap.hashes, removed);
+      Object.assign(localHashesMap.hashes, removed.hashes);
     }
 
     if (!paramsObj.noMap) {

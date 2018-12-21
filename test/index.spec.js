@@ -140,7 +140,7 @@ describe('Main', () => {
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
         expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, params);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
+        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
         expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, params);
         expect(removeExcessFiles).toBeCalledTimes(1);
@@ -183,9 +183,9 @@ describe('Main', () => {
         expect(isMetaChanged).toBeCalledTimes(1);
         expect(isMetaChanged).toBeCalledWith(params, paramsWithChangedMeta);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
+        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
-        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, localHM.hashes, params);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, localHM, params);
         expect(removeExcessFiles).toBeCalledTimes(1);
         expect(removeExcessFiles).toBeCalledWith(s3HelperInstance, removed);
         expect(storeHashesMapToS3).toBeCalledTimes(1);
@@ -220,7 +220,7 @@ describe('Main', () => {
         expect(computeRemoteHashesMap).toBeCalledTimes(0);
         expect(detectFileChanges).toBeCalledTimes(0);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
-        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, localHM.hashes, paramsWithNoMapNoRM);
+        expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, localHM, paramsWithNoMapNoRM);
         expect(removeExcessFiles).toBeCalledTimes(0);
         expect(storeHashesMapToS3).toBeCalledTimes(0);
         expect(invalidateCFDistribution).toBeCalledTimes(0);
@@ -234,9 +234,9 @@ describe('Main', () => {
     const paramsWithNoRm = Object.assign({ noRm: true }, params);
     const localHM = { hashes: { entry1: 'value1' }, params: paramsWithNoRm };
     const remoteHM = { hashes: { entry2: 'value2' }, params };
-    const changed = { entry1: 'value1' };
-    const removed = { entry2: 'value2' };
-    const resMap = { hashes: Object.assign({}, changed, removed), params: paramsWithNoRm };
+    const changed = { hashes: { entry1: 'value1' } };
+    const removed = { hashes: { entry2: 'value2' } };
+    const resMap = { hashes: Object.assign({}, changed.hashes, removed.hashes), params: paramsWithNoRm };
     params.noRm = true;
     processParams.mockReturnValue(paramsWithNoRm);
     applyGlobPattern.mockResolvedValue(fileNames);
@@ -260,7 +260,7 @@ describe('Main', () => {
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
         expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, paramsWithNoRm);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
+        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
         expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, paramsWithNoRm);
         expect(removeExcessFiles).toBeCalledTimes(0);
@@ -278,9 +278,9 @@ describe('Main', () => {
     const paramsWithNoMap = Object.assign({ noMap: true }, params);
     const localHM = { hashes: { entry1: 'value1' }, params: paramsWithNoMap };
     const remoteHM = { hashes: { entry2: 'value2' }, params };
-    const changed = { entry1: 'value1' };
-    const removed = { entry2: 'value2' };
-    const resMap = { hashes: changed, params: paramsWithNoMap };
+    const changed = { hashes: { entry1: 'value1' } };
+    const removed = { hashes: { entry2: 'value2' } };
+    const resMap = { hashes: changed.hashes, params: paramsWithNoMap };
     params.noRm = true;
     processParams.mockReturnValue(paramsWithNoMap);
     applyGlobPattern.mockResolvedValue(fileNames);
@@ -304,7 +304,7 @@ describe('Main', () => {
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
         expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, paramsWithNoMap);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
+        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
         expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, paramsWithNoMap);
         expect(removeExcessFiles).toBeCalledTimes(1);
@@ -321,8 +321,8 @@ describe('Main', () => {
     const fileNames = ['/folder/file1'];
     const localHM = { hashes: { entry1: 'value1' }, params };
     const remoteHM = { hashes: { entry2: 'value2' }, params };
-    const changed = { entry3: 'value3' };
-    const removed = { entry4: 'value4' };
+    const changed = { hashes: { entry3: 'value3' } };
+    const removed = { hashes: { entry4: 'value4' } };
     const cfClienStub = {
       method: () => {
       },
@@ -353,7 +353,7 @@ describe('Main', () => {
         expect(computeRemoteHashesMap).toBeCalledTimes(1);
         expect(computeRemoteHashesMap).toBeCalledWith(s3HelperInstance, params);
         expect(detectFileChanges).toBeCalledTimes(1);
-        expect(detectFileChanges).toBeCalledWith(localHM.hashes, remoteHM.hashes);
+        expect(detectFileChanges).toBeCalledWith(localHM, remoteHM);
         expect(uploadObjectsToS3).toBeCalledTimes(1);
         expect(uploadObjectsToS3).toBeCalledWith(s3HelperInstance, changed, params);
         expect(removeExcessFiles).toBeCalledTimes(1);

@@ -68,18 +68,18 @@ describe('S3 Helper', () => {
       const maxBatchSize = 1000;
       const batchesCount = 2;
       const entriesCount = maxBatchSize * batchesCount;
-      const toDelete = {};
+      const keys = [];
       for (let i = 0; i < entriesCount; i++) {
-        toDelete['entry' + i] = 'value' + i;
+        keys.push('entry' + i);
       }
-      const allObjects = Object.keys(toDelete).map(Key => ({ Key }));
+      const allObjects = keys.map(Key => ({ Key }));
       const batches = [];
       for (let i = 0; i < batchesCount; i++) {
         batches.push(allObjects.slice(i * maxBatchSize, i * maxBatchSize + maxBatchSize));
       }
       utils.parallel.mockResolvedValue();
       const instance = s3Helper.getInstance(s3Mock, params);
-      instance.deleteObjects(toDelete)
+      instance.deleteObjects(keys)
         .then(() => {
           expect(utils.parallel).toBeCalledTimes(1);
           expect(utils.parallel.mock.calls[0][0]).toEqual(batches);
@@ -107,19 +107,21 @@ describe('S3 Helper', () => {
       const basePath = __dirname;
       const fileName = 'entry1';
       const toUpload = {
-        entry1: 'value1',
-        entry2: 'value2',
+        hashes: {
+          [fileName]: 'value1',
+          entry2: 'value2',
+        },
       };
       instance.uploadObjects(toUpload, basePath)
         .then(() => {
           expect(utils.parallel).toBeCalledTimes(1);
-          expect(utils.parallel.mock.calls[0][0]).toEqual(Object.keys(toUpload));
+          expect(utils.parallel.mock.calls[0][0]).toEqual(Object.keys(toUpload.hashes));
           expect(utils.parallel.mock.calls[0][2]).toEqual(params.concurrency);
           return utils.parallel.mock.calls[0][1](fileName);
         })
         .then(() => {
           expect(instance._uploadObject).toBeCalledTimes(1);
-          expect(instance._uploadObject).toBeCalledWith(fileName, toUpload[fileName], basePath);
+          expect(instance._uploadObject).toBeCalledWith(fileName, toUpload, basePath);
           done();
         })
         .catch(done);
@@ -227,23 +229,23 @@ describe('S3 Helper', () => {
       delete params.cache;
       delete params.immutable;
       const fileName = '/folder1/file1.txt';
-      const fileData = {
-        contentMD5: 'md5',
-        gzip: false,
+      const toUpload = {
+        hashes: { [fileName]: 'hash' },
+        gzip: {},
       };
       const streamMock = new stream.Readable();
       const basePath = __dirname;
       jest.spyOn(mime, 'getType').mockReturnValue();
       jest.spyOn(fs, 'createReadStream').mockReturnValue(streamMock);
       const instance = s3Helper.getInstance(s3Mock, params);
-      instance._uploadObject(fileName, fileData, basePath)
+      instance._uploadObject(fileName, toUpload, basePath)
         .then(() => {
           expect(s3Mock.upload).toBeCalledTimes(1);
           expect(s3Mock.upload).toBeCalledWith({
             ACL: 'public-read',
             Key: fileName,
             Body: streamMock,
-            ContentMD5: fileData.contentMD5,
+            ContentMD5: Buffer.from(toUpload.hashes[fileName], 'hex').toString('base64'),
           });
           expect(mime.getType).toBeCalledTimes(1);
           expect(mime.getType).toBeCalledWith(fileName);
@@ -257,9 +259,9 @@ describe('S3 Helper', () => {
 
     test('adds additional metadata and gzips data', done => {
       const fileName = '/folder1/file1.txt';
-      const fileData = {
-        contentMD5: 'md5',
-        gzip: true,
+      const toUpload = {
+        hashes: { [fileName]: 'hash' },
+        gzip: { [fileName]: true },
       };
       const cacheControl = ['max-age=' + params.cache, 'immutable'].join(', ');
       const streamMock = new stream.Readable();
@@ -269,7 +271,7 @@ describe('S3 Helper', () => {
       jest.spyOn(fs, 'createReadStream').mockReturnValue(streamMock);
       utils.gzipStream.mockReturnValue(streamMock);
       const instance = s3Helper.getInstance(s3Mock, params);
-      instance._uploadObject(fileName, fileData, basePath)
+      instance._uploadObject(fileName, toUpload, basePath)
         .then(() => {
           expect(s3Mock.upload).toBeCalledTimes(1);
           expect(s3Mock.upload).toBeCalledWith({
@@ -277,7 +279,7 @@ describe('S3 Helper', () => {
             Key: fileName,
             Body: streamMock,
             ContentEncoding: 'gzip',
-            ContentMD5: fileData.contentMD5,
+            ContentMD5: Buffer.from(toUpload.hashes[fileName], 'hex').toString('base64'),
             ContentType: mimeType,
             CacheControl: cacheControl,
           });
@@ -319,10 +321,7 @@ describe('S3 Helper', () => {
       const expectedMap = {};
       for (const item of allItems) {
         if (item.Key !== params.fileName || params.noMap) {
-          expectedMap[item.Key] = {
-            eTag: item.ETag,
-            contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
-          };
+          expectedMap[item.Key] = item.ETag.slice(1, -1);
         }
       }
 
@@ -376,10 +375,7 @@ describe('S3 Helper', () => {
       const expectedMap = {};
       for (const item of allItems) {
         if (item.Key !== params.fileName || params.noMap) {
-          expectedMap[item.Key] = {
-            eTag: item.ETag,
-            contentMD5: Buffer.from(item.ETag.slice(1, -1), 'hex').toString('base64'),
-          };
+          expectedMap[item.Key] = item.ETag.slice(1, -1);
         }
       }
 

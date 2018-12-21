@@ -36,7 +36,7 @@ module.exports.applyGlobPattern = function* ({ basePath, pattern }) {
  * @param toDelete - Map of files to delete
  */
 module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
-  const fileNames = Object.keys(toDelete);
+  const fileNames = Object.keys(toDelete.hashes);
   const filesAmount = fileNames.length;
   if (filesAmount) {
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
@@ -45,7 +45,7 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾\n');
     logger.info('▹ Removing');
     try {
-      yield s3HelperInstance.deleteObjects(toDelete);
+      yield s3HelperInstance.deleteObjects(fileNames);
     } catch (e) {
       throw new CommonError('Files removal failed', e);
     }
@@ -62,8 +62,12 @@ module.exports.removeExcessFiles = function* (s3HelperInstance, toDelete) {
  */
 module.exports.storeHashesMapToS3 = function* (s3HelperInstance, localHashesMap) {
   logger.info('▹ Uploading map of file hashes');
+  const mapToStore = {
+    hashes: localHashesMap.hashes,
+    params: localHashesMap.params,
+  };
   try {
-    yield s3HelperInstance.storeRemoteHashesMap(localHashesMap);
+    yield s3HelperInstance.storeRemoteHashesMap(mapToStore);
   } catch (e) {
     throw new CommonError('Files hash map uploading failed', e);
   }
@@ -98,7 +102,7 @@ module.exports.invalidateCFDistribution = function* (cfClient, { cfDistId, cfInv
  * @param basePath
  */
 module.exports.uploadObjectsToS3 = function* (s3HelperInstance, toUpload, { basePath }) {
-  const fileNames = Object.keys(toUpload);
+  const fileNames = Object.keys(toUpload.hashes);
   const filesAmount = fileNames.length;
   if (filesAmount) {
     logger.verbose('∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾∾');
@@ -126,16 +130,25 @@ module.exports.uploadObjectsToS3 = function* (s3HelperInstance, toUpload, { base
  */
 module.exports.detectFileChanges = (localHashes, remoteHashes) => {
   const remoteMapCopy = Object.assign({}, remoteHashes);
-  const changed = {};
-  for (const key of Object.keys(localHashes)) {
-    const remoteFileData = remoteMapCopy[key];
-    if (remoteFileData) {
-      delete remoteMapCopy[key];
-      if (remoteFileData.eTag !== localHashes[key].eTag) {
-        changed[key] = localHashes[key];
+  const changed = {
+    hashes: {},
+    gzip: {},
+  };
+  for (const key of Object.keys(localHashes.hashes)) {
+    const remoteFileHash = remoteMapCopy.hashes[key];
+    if (remoteFileHash) {
+      delete remoteMapCopy.hashes[key];
+      if (remoteFileHash !== localHashes.hashes[key]) {
+        changed.hashes[key] = localHashes.hashes[key];
+        if (localHashes.gzip[key]) {
+          changed.gzip[key] = localHashes.gzip[key];
+        }
       }
     } else {
-      changed[key] = localHashes[key];
+      changed.hashes[key] = localHashes.hashes[key];
+      if (localHashes.gzip[key]) {
+        changed.gzip[key] = localHashes.gzip[key];
+      }
     }
   }
   return { changed, removed: remoteMapCopy };
@@ -175,9 +188,9 @@ module.exports.computeLocalHashesMap = function* (fileNames, params) {
   } catch (e) {
     throw new CommonError('Local files hash map computation failed', e);
   }
-  const localFilesAmount = Object.keys(localHashesMap).length;
+  const localFilesAmount = Object.keys(localHashesMap.hashes).length;
   logger.info('✓ Complete-> Found', localFilesAmount, 'files locally\n');
-  return { hashes: localHashesMap, params };
+  return Object.assign({ params }, localHashesMap);
 };
 
 /**

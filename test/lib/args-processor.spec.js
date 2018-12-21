@@ -69,34 +69,25 @@ describe('Arguments processor', () => {
     test('throws if bucket name is not supplied', () => {
       const inputParams = Object.assign({}, params);
       delete inputParams.bucket;
-      try {
-        argsProcessor.processParams(inputParams);
-        throw new Error('Should have thrown');
-      } catch (e) {
-        expect(e.message).toEqual('Bucket name should be set');
-      }
+      expect(() => argsProcessor.processParams(inputParams)).toThrowError('Bucket name should be set');
     });
 
     test('throws if bucket name contains slash', () => {
       const inputParams = Object.assign({}, params);
       inputParams.bucket += '/';
-      try {
-        argsProcessor.processParams(inputParams);
-        throw new Error('Should have thrown');
-      } catch (e) {
-        expect(e.message).toEqual('Bucket name should contain no slashes');
-      }
+      expect(() => argsProcessor.processParams(inputParams)).toThrowError('Bucket name should contain no slashes');
     });
 
     test('throws if bucket name contains backslash', () => {
       const inputParams = Object.assign({}, params);
       inputParams.bucket += '\\';
-      try {
-        argsProcessor.processParams(inputParams);
-        throw new Error('Should have thrown');
-      } catch (e) {
-        expect(e.message).toEqual('Bucket name should contain no slashes');
-      }
+      expect(() => argsProcessor.processParams(inputParams)).toThrowError('Bucket name should contain no slashes');
+    });
+
+    test('throws if unknown parameter is passed', () => {
+      const unknownParamName = 'unknown';
+      const inputParams = Object.assign({ [unknownParamName]: 'value' }, params);
+      expect(() => argsProcessor.processParams(inputParams)).toThrowError('Unknown parameter: ' + unknownParamName);
     });
 
     test('sanitizes values', () => {
@@ -128,12 +119,8 @@ describe('Arguments processor', () => {
     test('throws if concurrency is not a positive integer', () => {
       const inputParams = Object.assign({}, params);
       utils.isPositiveInteger.mockReturnValue(false);
-      try {
-        argsProcessor.processParams(inputParams);
-        throw new Error('Should have thrown');
-      } catch (e) {
-        expect(e.message).toEqual('Concurrency value should be a positive integer');
-      }
+      expect(() => argsProcessor.processParams(inputParams))
+        .toThrowError('Concurrency value should be a positive integer');
     });
 
     test('converts concurrency to integer if it represents a positive integer', () => {
