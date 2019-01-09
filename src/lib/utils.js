@@ -63,9 +63,9 @@ module.exports.parallel = (args, fn, concurrency = 1) => {
 
   function chainNext(p) {
     const arg = argsCopy.shift();
-    return arg ? p.then(() => chainNext(fn(arg.val).then(r => {
-      result[arg.ind] = r;
-    }))) : p;
+    return arg
+      ? p.then(() => chainNext(fn(arg.val).then(r => { result[arg.ind] = r; })))
+      : p;
   }
 
   return Promise.all(promises.map(chainNext)).then(() => result);

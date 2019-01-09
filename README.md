@@ -10,6 +10,8 @@ Node.js utility to sync files to Amazon S3 and, optionally, invalidate CloudFron
 
 Designed to ease CloudFront + S3 website hosting management. May be used to efficiently upload files to S3.
 
+Checkout [Medium post](https://medium.com/@denis.fatkhudinov/managing-website-deployment-on-aws-s3-cloudfront-with-node-js-bea1c164b3dd) for background and in-detail improvements description.
+
 ## Usage
 
 npm >= 5.2.0
