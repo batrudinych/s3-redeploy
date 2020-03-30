@@ -5,6 +5,7 @@ const { CommonError } = require('./errors');
 const supportedParameters = [
   'bucket',
   'cwd',
+  'prefix',
   'pattern',
   'gzip',
   'profile',
@@ -65,6 +66,7 @@ module.exports.processParams = params => {
 
   result.pattern = params.pattern || './**';
   result.cwd = params.cwd || '';
+  result.prefix = params.prefix || '';
 
   if (result.concurrency) {
     if (!isPositiveInteger(result.concurrency)) {

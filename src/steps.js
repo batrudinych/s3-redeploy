@@ -166,7 +166,7 @@ module.exports.configureAwsSdk = params => {
     region: params.region,
   };
   aws.config.update(awsOptions);
-  aws.config.s3 = { params: { Bucket: params.bucket } };
+  aws.config.s3 = { params: { Bucket: params.bucket , Prefix: params.prefix } };
   if (params.profile) {
     aws.config.credentials = new aws.SharedIniFileCredentials({ profile: params.profile });
   }

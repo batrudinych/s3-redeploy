@@ -13,6 +13,7 @@ class S3Helper {
     this._noMap = params.noMap;
     this._gzip = params.gzip;
     this._mapFileName = params.fileName;
+    this._keyPrefix = params.prefix + '/';
     this._concurrency = params.concurrency;
     this._s3Client = s3Client;
 
@@ -36,7 +37,7 @@ class S3Helper {
    * @param keys - List of file names
    */
   deleteObjects(keys) {
-    const allObjects = keys.map(Key => ({ Key }));
+    const allObjects = keys.map(Key => ({ Key: this._keyPrefix + Key }));
     const batchSize = 1000;
     const batchesCount = Math.ceil(allObjects.length / batchSize);
     const batches = [];
@@ -70,7 +71,7 @@ class S3Helper {
    * @returns {Promise<Object>} - Map of file hashes
    */
   getRemoteHashesMap() {
-    return this._s3Client.getObject({ Key: this._mapFileName })
+    return this._s3Client.getObject({ Key: this._keyPrefix + this._mapFileName })
       .promise()
       .then(data => data.ContentEncoding === 'gzip' ? gunzipAsync(data.Body) : data.Body)
       .then(buff => JSON.parse(buff.toString('utf8')))
@@ -89,7 +90,7 @@ class S3Helper {
     const mapUploadParams = { ContentEncoding: 'gzip' };
     return gzipAsync(JSON.stringify(map))
       .then(buff => this._s3Client.putObject(Object.assign({
-        Key: this._mapFileName,
+        Key: this._keyPrefix + this._mapFileName,
         Body: buff,
       }, mapUploadParams)).promise());
   }
@@ -100,13 +101,13 @@ class S3Helper {
    * @returns {Object}
    */
   * computeRemoteFilesStats() {
-    const params = {};
+    const params = { Prefix: this._keyPrefix };
     let hasNext = true;
     const remoteFilesStats = {};
     while (hasNext) {
       const { Contents, IsTruncated, NextContinuationToken } = yield this._s3Client.listObjectsV2(params).promise();
       for (const item of Contents) {
-        if (!this._noMap && item.Key === this._mapFileName) continue;
+        if (!this._noMap && item.Key === this._keyPrefix + this._mapFileName) continue;
         remoteFilesStats[item.Key] = item.ETag.slice(1, -1);
       }
       hasNext = IsTruncated;
@@ -129,7 +130,7 @@ class S3Helper {
     const fStream = fs.createReadStream(path.join(basePath, fileName));
     const uploadParams = {
       ACL: 'public-read',
-      Key: fileName,
+      Key: this._keyPrefix + fileName,
       Body: shouldBeZipped ? gzipStream(fStream) : fStream,
       ContentMD5: Buffer.from(toUpload.hashes[fileName], 'hex').toString('base64'),
     };
