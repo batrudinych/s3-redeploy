@@ -325,6 +325,7 @@ describe('Steps', () => {
         region: 'awsRegion',
       };
       const expectedOptions = Object.assign({
+        computeChecksums: true,
         sslEnabled: true,
       }, params);
       const configuredAws = steps.configureAwsSdk(params);
@@ -344,7 +345,10 @@ describe('Steps', () => {
 
     test('sets region and profile for aws sdk module', () => {
       const params = { region: 'awsRegion', profile: 'profile' };
-      const expectedOptions = Object.assign({ sslEnabled: true }, params);
+      const expectedOptions = Object.assign({
+        computeChecksums: true,
+        sslEnabled: true,
+      }, params);
       delete expectedOptions.profile;
 
       const sharedCredentialsMock = { cred: 'val' };

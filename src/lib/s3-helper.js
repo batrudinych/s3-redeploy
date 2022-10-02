@@ -131,7 +131,6 @@ class S3Helper {
       ACL: 'public-read',
       Key: fileName,
       Body: shouldBeZipped ? gzipStream(fStream) : fStream,
-      ContentMD5: Buffer.from(toUpload.hashes[fileName], 'hex').toString('base64'),
     };
 
     if (contentType) {
