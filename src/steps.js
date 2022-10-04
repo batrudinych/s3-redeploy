@@ -162,6 +162,7 @@ module.exports.detectFileChanges = (localHashes, remoteHashes) => {
 module.exports.configureAwsSdk = params => {
   logger.info('▹ Configuring AWS SDK');
   const awsOptions = {
+    computeChecksums: true,
     sslEnabled: true,
     region: params.region,
   };
